@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <ListPreference
+        android:key="rpzw_ip"
+        android:title="Raspberry Pi IP adrress"
+        android:defaultValue="pi@192.168.1.108"
+        android:entryValues="@array/ip_addresses"
+        android:entries = "@array/board_id"
+        android:summary="Select IP address of device"/>
+</PreferenceScreen>

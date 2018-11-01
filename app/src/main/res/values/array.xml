@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="board_id">
+        <item>board 1</item>
+        <item>board 2</item>
+    </string-array>
+
+    <string-array name="ip_addresses">
+        <item>192.168.1.108</item>
+        <item>192.168.1.125</item>
+    </string-array>
+</resources>
