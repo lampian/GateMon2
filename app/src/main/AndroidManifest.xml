@@ -23,16 +23,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <activity android:name=".SettingsActivity">
-
-        </activity>
-
         <service
             android:name=".SSHIntentService"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
-
+        <service
+            android:name=".SSH2IntentService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE"></service>
     </application>
 
 </manifest>

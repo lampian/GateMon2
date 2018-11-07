@@ -10,6 +10,7 @@ import java.io.ByteArrayOutputStream;
 import java.util.Properties;
 
 import static android.os.SystemClock.sleep;
+import static android.support.constraint.Constraints.TAG;
 
 //import java.io.InputStream;
 
@@ -50,7 +51,12 @@ class SSHObject {
         prop.put("StrictHostKeyChecking", "no");
         session.setConfig(prop);
 
-        session.connect();
+        try {
+            session.connect();
+        } catch (Exception e) {
+            Log.i(TAG, "SSH0 connection failure");
+        }
+        //session.connect();
 
         // SSH Channel
         ChannelExec channelssh = (ChannelExec) session.openChannel("exec");
@@ -71,7 +77,7 @@ class SSHObject {
         session.disconnect();
 
         outStr= baos.toString();
-        Log.i("SSH :", "GetSSHStr : " + outStr);
+        Log.i("SSH0 :", "GetSSHStr : " + outStr);
 
         //sleep(60000);
         return outStr;

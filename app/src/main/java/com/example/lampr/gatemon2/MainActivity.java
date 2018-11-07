@@ -5,6 +5,7 @@ import android.app.job.JobScheduler;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -15,38 +16,47 @@ import android.view.View;
 import android.widget.ProgressBar;
 import android.widget.RadioButton;
 import android.widget.TextView;
+import android.widget.ToggleButton;
 
 import java.lang.ref.WeakReference;
 
-import static com.example.lampr.gatemon2.SSHIntentService.BUNDLE_SSH_I2C_ADC1_STR;
-import static com.example.lampr.gatemon2.SSHIntentService.BUNDLE_SSH_I2C_ADC2_STR;
-import static com.example.lampr.gatemon2.SSHIntentService.BUNDLE_SSH_I2C_ADC3_STR;
-import static com.example.lampr.gatemon2.SSHIntentService.BUNDLE_SSH_STATUS_STR;
-import static com.example.lampr.gatemon2.SSHIntentService.BUNDLE_SSH_STR;
+import static com.example.lampr.gatemon2.SSH2IntentService.ACTION_CHANGE_HOST;
+import static com.example.lampr.gatemon2.SSH2IntentService.ACTION_GET_INPUTS;
+import static com.example.lampr.gatemon2.SSH2IntentService.ACTION_SET_OUT1;
+import static com.example.lampr.gatemon2.SSH2IntentService.ACTION_SET_OUT2;
+import static com.example.lampr.gatemon2.SSH2IntentService.BUNDLE_SSH_I2C_ADC1_STR;
+import static com.example.lampr.gatemon2.SSH2IntentService.BUNDLE_SSH_I2C_ADC2_STR;
+import static com.example.lampr.gatemon2.SSH2IntentService.BUNDLE_SSH_I2C_ADC3_STR;
+import static com.example.lampr.gatemon2.SSH2IntentService.BUNDLE_SSH_STATUS_STR;
+import static com.example.lampr.gatemon2.SSH2IntentService.BUNDLE_SSH_STR;
 
 
 public class MainActivity extends AppCompatActivity {
 
-    private ComponentName mServiceComponent;
+    //private ComponentName mServiceComponent;
 
     // Handler for incoming messages from the service.
     private IncomingMessageHandler mHandler;
-    private SSHIntentService mIntent;
+    //private SSHIntentService mIntent;
+    //private SSH2IntentService m2Intent;
 
-    int adc1_val = 0;
+    //int adc1_val = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        RadioButton mRB1 = (RadioButton) findViewById(R.id.ip1); // initiate a radio button
-        RadioButton mRB2 = (RadioButton) findViewById(R.id.ip2); // initiate a radio button
-        mRB2.setChecked(true);
+        //RadioButton mRB1 = (RadioButton) findViewById(R.id.ip1); // initiate a radio button
+        //RadioButton mRB2 = findViewById(R.id.ip2); // initiate a radio button
+        //mRB2.setChecked(true);
 
-        mServiceComponent = new ComponentName(this, SSHIntentService.class);
+        //mServiceComponent = new ComponentName(this, SSHIntentService.class);
         mHandler = new IncomingMessageHandler(this);
+
+        //use job scheduler to handle ssh monitoring function which must stay alive
         scheduleJob();
+
 
     }
 
@@ -56,28 +66,54 @@ public class MainActivity extends AppCompatActivity {
     public void scheduleJob() {
 
         int mJobId = 1234;
+        ComponentName mServiceComponent = new ComponentName(this, SSHIntentService.class);
         JobInfo.Builder builder = new JobInfo.Builder(mJobId, mServiceComponent);
-
         builder.setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY);
 
         // Schedule job
-        Log.i("SSH :", "ScheduleJob");
+        Log.i("SSH1 :", "ScheduleJob");
         JobScheduler tm = (JobScheduler) getSystemService(Context.JOB_SCHEDULER_SERVICE);
         assert tm != null;
         tm.schedule(builder.build());
+
     }
 
     @Override
     protected void onStart() {
         super.onStart();
         // Start service and provide it a way to communicate with this class.
-        Messenger messengerIncoming = new Messenger(mHandler);
-        mIntent = new SSHIntentService();
-        mIntent.startActionGetInputs( this, messengerIncoming, "" );
-
+        //Messenger messengerIncoming = new Messenger(mHandler);
+        SSHIntentService.startActionMonitorIO( this, "", "" );
     }
 
+//================================================
+    Handler h = new Handler();
+    int delay = 5*1000; //1 second=1000 milisecond, 15*1000=15seconds
+    Runnable runnable;
 
+    @Override
+    protected void onResume() {
+        //start handler as activity become visible
+        h.postDelayed( runnable = new Runnable() {
+            public void run() {
+                //do something
+                Log.i("SSH :", "Handler for post delay");
+                Messenger messengerIncoming = new Messenger(mHandler);
+                //mIntent.startActionSetOut1( this, messengerIncoming, "" );
+                SSH2IntentService.startSSH2Service(getApplicationContext(), ACTION_GET_INPUTS, messengerIncoming, "");
+                h.postDelayed(runnable, delay);
+            }
+        }, delay);
+
+        super.onResume();
+    }
+
+    @Override
+    protected void onPause() {
+        h.removeCallbacks(runnable); //stop handler when activity not visible
+        super.onPause();
+    }
+//==============================
     @Override
     protected void onStop() {
         // A service can be "started" and/or "bound". In this case, it's "started" by this Activity
@@ -90,31 +126,51 @@ public class MainActivity extends AppCompatActivity {
 
     public void setLed16(View view) {
 
+        String tbTxt;
         Intent sIntent = new Intent();
-        sIntent.setAction(SSHIntentService.StopReceiver.ACTION_STOP);
+        //sIntent.setAction(SSHIntentService.StopReceiver.ACTION_STOP);
         sendBroadcast(sIntent);
 
         Messenger messengerIncoming = new Messenger(mHandler);
-        mIntent.startActionSetOut1( this, messengerIncoming, "" );
-        Log.i("SSH :", "ScheduleJob LED 16");
+        //mIntent.startActionSetOut1( this, messengerIncoming, "" );
+        ToggleButton tb = findViewById(R.id.led16);
+
+        if ( tb.isChecked() ) {
+            tbTxt = "1";
+        } else {
+            tbTxt = "0";
+        }
+        SSH2IntentService.startSSH2Service(this, ACTION_SET_OUT1, messengerIncoming, tbTxt);
+        Log.i("SSH2 :", "ScheduleJob LED 16");
 
         //continue with reads
-        mIntent.startActionGetInputs( this, messengerIncoming, "" );
-
+        //mIntent.startActionGetInputs( this, messengerIncoming, "" );
+        //SSH2IntentService.startSSH2Service(this, ACTION_GET_INPUTS, messengerIncoming, "");
     }
 
     public void setLed17(View view) {
 
+        String tbTxt;
         Intent sIntent = new Intent();
-        sIntent.setAction(SSHIntentService.StopReceiver.ACTION_STOP);
+        //sIntent.setAction(SSHIntentService.StopReceiver.ACTION_STOP);
         sendBroadcast(sIntent);
 
         Messenger messengerIncoming = new Messenger(mHandler);
-        mIntent.startActionSetOut2( this, messengerIncoming, "" );
-        Log.i("SSH :", "ScheduleJob LED 17");
+        //mIntent.startActionSetOut2( this, messengerIncoming, "" );
+        ToggleButton tb = findViewById(R.id.led17);
+
+        if ( tb.isChecked() ) {
+            tbTxt = "1";
+        } else {
+            tbTxt = "0";
+        }
+
+        SSH2IntentService.startSSH2Service(this, ACTION_SET_OUT2, messengerIncoming, tbTxt);
+        Log.i("SSH2 :", "ScheduleJob LED 17");
 
         //continue with reads
-        mIntent.startActionGetInputs( this, messengerIncoming, "" );
+        //mIntent.startActionGetInputs( this, messengerIncoming, "" );
+        //SSH2IntentService.startSSH2Service(this, ACTION_GET_INPUTS, messengerIncoming, "");
 
     }
 
@@ -122,45 +178,37 @@ public class MainActivity extends AppCompatActivity {
 
         String newHostIP = "192.168.1.108";
         Intent sIntent = new Intent();
-        sIntent.setAction(SSHIntentService.StopReceiver.ACTION_STOP);
         sendBroadcast(sIntent);
 
-        RadioButton mRB1 = (RadioButton) findViewById(R.id.ip1); // initiate a radio button
-        RadioButton mRB2 = (RadioButton) findViewById(R.id.ip2); // initiate a radio button
+        RadioButton mRB2 = findViewById(R.id.ip2); // initiate a radio button
         Boolean mRB2Set = mRB2.isChecked(); // check current state of a radio button (true or false).
-        Boolean mRB1Set = mRB1.isChecked(); // check current state of a radio button (true or false).
         if (mRB2Set) {
             newHostIP = "192.168.1.125";
         }
-        else if (mRB1Set) {
-            newHostIP = "192.168.1.108";
-        }
-
         Messenger messengerIncoming = new Messenger(mHandler);
-        mIntent.changeHost( this, messengerIncoming , newHostIP );
-        Log.i("SSH :", "ScheduleJob change host");
-
+        SSH2IntentService.startSSH2Service(this, ACTION_CHANGE_HOST, messengerIncoming, newHostIP);
+        Log.i("SSH2 :", "ScheduleJob change host");
     }
 
     public void shutdownDevice(View view) {
         Intent sIntent = new Intent();
-        sIntent.setAction(SSHIntentService.StopReceiver.ACTION_STOP);
+        //sIntent.setAction(SSHIntentService.StopReceiver.ACTION_STOP);
         sendBroadcast(sIntent);
 
         Messenger messengerIncoming = new Messenger(mHandler);
-        mIntent.startActionSetOut3( this, messengerIncoming, "" );
+        //mIntent.startActionSetOut3( this, messengerIncoming, "" );
+        SSH2IntentService.startSSH2Service(this, ACTION_CHANGE_HOST, messengerIncoming, "");
         Log.i("SSH :", "ScheduleJob Shutdown");
 
         //continue with reads
-        mIntent.startActionGetInputs( this, messengerIncoming, "" );
+        //mIntent.startActionGetInputs( this, messengerIncoming, "" );
 
     }
 
 
     /**
      * A {@link Handler} allows you to send messages associated with a thread. A {@link Messenger}
-     * uses this handler to communicate from {@link SSHIntentService}. It's also used to make
-     * the start and stop views blink for a short period of time.
+     * uses this handler to communicate from {@link SSHIntentService}.
      */
     class IncomingMessageHandler extends Handler {
 
@@ -170,22 +218,20 @@ public class MainActivity extends AppCompatActivity {
         IncomingMessageHandler(MainActivity activity) {
             super(/* default looper */);
             this.mActivity = new WeakReference<>(activity);
+            //this.postDelayed(mGetInputs,1000 );
         }
+
 
         @Override
         public void handleMessage(Message msg) {
 
             CharSequence aCharSeq;
             String aStr;
-            String i2cStr;
             String ssh_status;
             Long aLong;
-            Integer adc1Val = 0;
-            Integer adc2Val = 0;
-            Integer adc3Val = 0;
-
-            int indexA;
-            int indexB;
+            Integer adc1Val;
+            Integer adc2Val;
+            Integer adc3Val;
 
             MainActivity mainActivity = mActivity.get();
             if (mainActivity == null) {
@@ -199,7 +245,7 @@ public class MainActivity extends AppCompatActivity {
                 aStr = aCharSeq.toString();
             } catch (Exception e) {
                 aStr = "SSH status unknown";
-                Log.i("SSH :", "Status read string bad");
+                Log.i("SSH3 :", "Status read string bad");
             }
             ssh_status = aStr;
 
@@ -209,7 +255,7 @@ public class MainActivity extends AppCompatActivity {
                 aStr = aCharSeq.toString();
             } catch (Exception e) {
                 aStr = "0000000\n";
-                Log.i("SSH :", "GPIO read string bad");
+                Log.i("SSH3 :", "GPIO read string bad");
             }
             aLong = StringToLong( aStr );
 
@@ -229,23 +275,30 @@ public class MainActivity extends AppCompatActivity {
 
             updateUi( aLong,  ssh_status, adc1Val, adc2Val, adc3Val );
 //            onStop();
+
         }
 
         int ParseI2CString( CharSequence aCS, int shrCnt ) {
 
             String i2cStr;
             String aStr;
-            assert aCS != null;
             int indexA;
             int indexB;
             int aInt;
+            if (aCS == null) {
+                throw new AssertionError();
+            }
             try {
                 i2cStr = aCS.toString();
             } catch (Exception e) {
-                i2cStr = "2 12 32\n";
-                Log.i("SSH :", "I2C string bad");
+                i2cStr = "2 0 0\n";
+                Log.i("SSH3 :", "I2C string bad");
             }
-            aStr = i2cStr.substring(0,1);
+            if (i2cStr.length() > 5) {
+                aStr = i2cStr.substring(0, 1);
+            } else {
+                aStr = "2 0 0\n";
+            }
             try {
                 if (Integer.parseInt(aStr) == 2) {
                     //example string in format of 2 x y\n, where x=[0 255] y=[0.255]
@@ -258,8 +311,8 @@ public class MainActivity extends AppCompatActivity {
                     aStr = i2cStr.substring(indexB, indexA);
                     Integer bInt = Integer.parseInt(aStr);
                     //bInt = bInt >> 2;
-                    aInt = aInt | bInt;
-                    aInt = aInt >> shrCnt;
+                    aInt |= bInt;
+                    aInt >>= shrCnt;
                 }
                 else {
                     //bytes returned by i2c bus <> 2
@@ -289,7 +342,7 @@ public class MainActivity extends AppCompatActivity {
                 aLong = (long) 0;
             }
 
-            bStr = Long.toHexString(aLong);
+            //bStr = Long.toHexString(aLong);
             //Log.i("SSH :", "StringToLong  " + bStr + " Long : " + aLong );
 
             return  aLong;
@@ -301,8 +354,10 @@ public class MainActivity extends AppCompatActivity {
 
 
             String swStatus;
+            boolean tbSame;
+            boolean tbXOR;
 
-            String aStr = Long.toHexString(aLong);
+            //String aStr = Long.toHexString(aLong);
             //Log.i("SSH :", "UpdateUi :" +  aStr + " Long : " + aLong );
             //Log.i("SSH return string :", "update ui " + aLong );
 
@@ -341,11 +396,36 @@ public class MainActivity extends AppCompatActivity {
             ProgressBar pb3 = findViewById(R.id.adc3);
             pb3.setProgress(aInt[2], true);
 
-            //pb.setIndeterminate(false);
-
             TextView tv5 = findViewById(R.id.ssh_status);
             tv5.setText( aSSHStatus );
 
+            //make toggle button red if the shown and actual state of the bit differs,
+            //make toglle button green of the shown and actual state are the same, ie Off and 0
+            ToggleButton tb1 = findViewById(R.id.led16);
+            if ((aLong & 0x10000) > 0)
+                tbXOR = true;
+            else
+                tbXOR = false;
+            tbXOR ^= tb1.isChecked();
+            if (!tbXOR) {
+                tb1.setBackgroundColor(Color.GREEN);
+            } else {
+                tb1.setBackgroundColor(Color.RED);
+            }
+
+            //make toggle button red if the shown and actual state of the bit differs,
+            //make toglle button green of the shown and actual state are the same, ie Off and 0
+            ToggleButton tb2 = findViewById(R.id.led17);
+            if ((aLong & 0x20000) > 0)
+                tbXOR = true;
+            else
+                tbXOR = false;
+            tbXOR ^= tb2.isChecked();
+            if (!tbXOR) {
+                tb2.setBackgroundColor(Color.GREEN);
+            } else {
+                tb2.setBackgroundColor(Color.RED);
+            }
 
         }
     }

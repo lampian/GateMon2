@@ -165,24 +165,29 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal" >
 
-        <Button
-            android:id="@+id/led1"
-            android:text="Set LED 16"
+        <ToggleButton
+            android:id="@+id/led16"
+            android:textOn="Led 16 On"
+            android:textOff="Led 16 Off"
             android:layout_width="0dp"
-            android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:textAlignment="center"
-            android:layout_marginTop="6dp"
-            android:layout_marginBottom="6dp"
-            android:layout_marginRight="6dp"
             android:layout_marginLeft="16dp"
+            android:layout_marginTop="6dp"
+            android:layout_marginRight="6dp"
+            android:layout_marginBottom="6dp"
+            android:layout_weight="1"
             android:background="@drawable/borders"
-            android:textColor="@android:color/black"
-            android:onClick="setLed16" />
+            android:checked="true"
+            android:editable="true"
+            android:onClick="setLed16"
+            android:textAlignment="center"
+            android:textColor="@android:color/black" />
 
-        <Button
-            android:id="@+id/led2"
-            android:text="Set Led 17"
+        <ToggleButton
+            android:id="@+id/led17"
+            android:checked="true"
+            android:textOn="Led 17 On"
+            android:textOff="Led 17 Off"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"

@@ -9,11 +9,11 @@ import android.content.Intent;
 import android.content.Context;
 import android.content.IntentFilter;
 //import android.os.Build;
-import android.os.Bundle;
-import android.os.Message;
-import android.os.Messenger;
-import android.os.Parcelable;
-import android.os.RemoteException;
+//import android.os.Bundle;
+//import android.os.Message;
+//import android.os.Messenger;
+//import android.os.Parcelable;
+//import android.os.RemoteException;
 //import android.support.annotation.RequiresApi;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.NotificationManagerCompat;
@@ -44,31 +44,16 @@ import java.util.Date;
  * helper methods.
  */
 public class SSHIntentService extends IntentService {
-    // IntentService can perform, e.g. ACTION_FETCH_NEW_ITEMS
-    private static final String ACTION_GET_INPUTS = "com.example.android.picntlservice.action.GET_INPUTS";
-    private static final String ACTION_SET_OUT1 = "com.example.android.picntlservice.action.SET_OUT1";
-    private static final String ACTION_SET_OUT2 = "com.example.android.picntlservice.action.SET_OUT2";
-    private static final String ACTION_SET_OUT3 = "com.example.android.picntlservice.action.SET_OUT3";
-    private static final String ACTION_CHANGE_HOST = "com.example.android.picntlservice.action.CHANGE_HOST";
 
 
+    private static final String ACTION_Monitor_IO = "com.example.android.picntlservice.action.MONITOR_IO";
     private static final String EXTRA_PARAM1 = "com.example.android.picntlservice.extra.PARAM1";
     private static final String EXTRA_PARAM2 = "com.example.android.picntlservice.extra.PARAM2";
 
     final static int RQS_STOP_SERVICE = 1;
 
-    static SSHObject aSSH = new SSHObject("lampiespi","pi", "192.168.1.125", 22);
-    //i2c handle
-    static String mAdc1Handle = "0";
-    static String mAdc2Handle = "1";
-    static String mAdc3Handle = "2";
-    //i2c device addresses
-    final static String ADC1 = "0x4d";
-    final static String ADC2 = "0x55";
-    final static String ADC3 = "0x5a";
-
-    //main activity messenger
-    private Messenger mActivityMessenger;
+    //instantiate SSHObject for use by this service
+    private static SSHObject aSSH;
 
     NotifyServiceReceiver notifyServiceReceiver;
     private static final int MY_NOTIFICATION_ID=1;
@@ -84,23 +69,7 @@ public class SSHIntentService extends IntentService {
 
     final static String ACTION = "NotifyServiceAction";
 
-    public static final String BUNDLE_SSH_STR = "com.example.android.picntlservice.extra.BUNDLE_SSH_STR";
-    public static final String BUNDLE_SSH_I2C_ADC1_STR = "com.example.android.picntlservice.extra.BUNDLE_SSH_I2C_ADC1_STR";
-    public static final String BUNDLE_SSH_I2C_ADC2_STR = "com.example.android.picntlservice.extra.BUNDLE_SSH_I2C_ADC2_STR";
-    public static final String BUNDLE_SSH_I2C_ADC3_STR = "com.example.android.picntlservice.extra.BUNDLE_SSH_I2C_ADC3_STR";
-    public static final String BUNDLE_SSH_STATUS_STR = "com.example.android.picntlservice.extra.BUNDLE_SSH_STATUS_STR";
 
-
-    public class StopReceiver extends BroadcastReceiver {
-
-        public static final String ACTION_STOP = "stop";
-
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            Log.i("SSH :", "Set continueGet false by StopReceiver");
-            continueGet = false;
-        }
-    }
 
     public class NotifyServiceReceiver extends BroadcastReceiver{
 
@@ -109,6 +78,7 @@ public class SSHIntentService extends IntentService {
             int rqs = arg1.getIntExtra("RQS", 0);
             if (rqs == RQS_STOP_SERVICE){
                 stopSelf();
+                Log.i("SSH1 :", "RQS STOP SERVICE");
             }
         }
     }
@@ -129,6 +99,12 @@ public class SSHIntentService extends IntentService {
     // implement this method.
     //public void onStartCommand()
 
+    @Override
+    public void onDestroy() {
+        unregisterReceiver(notifyServiceReceiver);
+        super.onDestroy();
+    }
+
     //system invokes this method to perform one-time setup procedures when the service is
     // initially created (before it calls either onStartCommand() or onBind()).
     // If the service is already running, this method is not called.
@@ -137,143 +113,56 @@ public class SSHIntentService extends IntentService {
         notifyServiceReceiver = new NotifyServiceReceiver();
         super.onCreate();
         SetupNotification();
+        aSSH = new SSHObject("lampiespi","pi", "192.168.1.125", 22);
+        Log.i("SSH1 :", "onCreate()");
     }
 
-
     /**
-     * Starts this service to perform action GetInputs with the given parameters. If
+     * Starts this service to perform action Monitor IO with the given parameters. If
      * the service is already performing a task this action will be queued.
      *
      * @see IntentService
      */
     // Main thread helper method
-    public static void startActionGetInputs(Context context, Parcelable param1, String param2) {
+    public static void startActionMonitorIO(Context context, String param1, String param2) {
         Intent intent = new Intent(context, SSHIntentService.class);
-        intent.setAction(ACTION_GET_INPUTS);
+        intent.setAction(ACTION_Monitor_IO);
         intent.putExtra(EXTRA_PARAM1, param1);
         intent.putExtra(EXTRA_PARAM2, param2);
         context.startService(intent);
+        Log.i("SSH1 :", "startActionMonitorIO()");
     }
 
-    /**
-     * Starts this service to perform action Baz with the given parameters. If
-     * the service is already performing a task this action will be queued.
-     *
-     * @see IntentService
-     */
-    // Main thread helper method
-    public static void startActionSetOut1(Context context, Parcelable param1, String param2) {
-        Intent intent = new Intent(context, SSHIntentService.class);
-        intent.setAction(ACTION_SET_OUT1);
-        intent.putExtra(EXTRA_PARAM1, param1);
-        intent.putExtra(EXTRA_PARAM2, param2);
-        context.startService(intent);
-    }
-
-    /**
-     * Starts this service to perform action Baz with the given parameters. If
-     * the service is already performing a task this action will be queued.
-     *
-     * @see IntentService
-     */
-    // Main thread helper method
-    public static void startActionSetOut2(Context context, Parcelable param1, String param2) {
-        Intent intent = new Intent(context, SSHIntentService.class);
-        intent.setAction(ACTION_SET_OUT2);
-        intent.putExtra(EXTRA_PARAM1, param1);
-        intent.putExtra(EXTRA_PARAM2, param2);
-        context.startService(intent);
-    }
-
-    // Main thread helper method
-    public static void startActionSetOut3(Context context, Parcelable param1, String param2) {
-        Intent intent = new Intent(context, SSHIntentService.class);
-        intent.setAction(ACTION_SET_OUT3);
-        intent.putExtra(EXTRA_PARAM1, param1);
-        intent.putExtra(EXTRA_PARAM2, param2);
-        context.startService(intent);
-    }
-
-    // Main thread helper method
-    public static void changeHost(Context context, Parcelable param1, String param2) {
-        Intent intent = new Intent(context, SSHIntentService.class);
-        intent.setAction(ACTION_CHANGE_HOST);
-        intent.putExtra(EXTRA_PARAM1, param1);
-        intent.putExtra(EXTRA_PARAM2, param2);
-        context.startService(intent);
-    }
 
     //  The IntentService calls this method from the default worker thread with
     //  the intent that started the service. When this method returns, IntentService
     //  stops the service, as appropriate.
     @Override
     protected void onHandleIntent(Intent intent) {
-
-        IntentFilter filter = new IntentFilter(StopReceiver.ACTION_STOP);
-        filter.addCategory(Intent.CATEGORY_DEFAULT);
-        StopReceiver receiver = new StopReceiver();
-        registerReceiver(receiver, filter);
+        Log.i("SSH1 :", "onHandleIntent()");
 
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(ACTION);
         registerReceiver(notifyServiceReceiver, intentFilter);
-
-        //SetupNotification();
-
         if (intent != null) {
             final String action = intent.getAction();
-            if (ACTION_GET_INPUTS.equals(action)) {
+            if (ACTION_Monitor_IO.equals(action)) {
                 //final String param1 = intent.getStringExtra(EXTRA_PARAM1);
-                mActivityMessenger = intent.getParcelableExtra(EXTRA_PARAM1);
-                final String param2 = intent.getStringExtra(EXTRA_PARAM2);
-                continueGet = true;
-                Log.i("SSH :", "Set continueGet true by onHandleIntent");
-                handleActionGetInputs(param2);
-
-
-            } else if (ACTION_SET_OUT1.equals(action)) {
-                //final String param1 = intent.getStringExtra(EXTRA_PARAM1);
-                //final String param2 = intent.getStringExtra(EXTRA_PARAM2);
-                mActivityMessenger = intent.getParcelableExtra(EXTRA_PARAM1);
-                handleActionSetOut1();
-            } else if (ACTION_SET_OUT2.equals(action)) {
-                //final String param1 = intent.getStringExtra(EXTRA_PARAM1);
-                //final String param2 = intent.getStringExtra(EXTRA_PARAM2);
-                mActivityMessenger = intent.getParcelableExtra(EXTRA_PARAM1);
-                handleActionSetOut2();
-            } else if (ACTION_SET_OUT3.equals(action)) {
-                //final String param1 = intent.getStringExtra(EXTRA_PARAM1);
-                //final String param2 = intent.getStringExtra(EXTRA_PARAM2);
-                mActivityMessenger = intent.getParcelableExtra(EXTRA_PARAM1);
-                handleActionSetOut3();
-            } else if (ACTION_CHANGE_HOST.equals(action)) {
-                //string contains new host ip
                 final String param1 = intent.getStringExtra(EXTRA_PARAM1);
                 final String param2 = intent.getStringExtra(EXTRA_PARAM2);
-                mActivityMessenger = intent.getParcelableExtra(EXTRA_PARAM1);
-                changeHost( param2 );
+                handleActionMonitorIO(param2);
             }
-
         }
-        unregisterReceiver(receiver);
-
     }
 
     /**
      * Handle action getinputs provided background thread with the provided
-     * parameters.
-     * keep thread running until continueGet is set to false to give other task chance to
-     * execute.
-     * control will on enter into this routine, immediately execute the get inputs actions.
+     * parameters. Keep thread running.
      * After the first loop executed, wait for xxx seconds before executing get inputs actions.
      *
      */
-    private void handleActionGetInputs(String param2) {
+    private void handleActionMonitorIO(String param2) {
 
-        String aStr;
-        String i2cResp1 = "0 0\n";
-        String i2cResp2 = "0 0\n";
-        String i2cResp3 = "0 0\n";
         String sw5Value;
         String sw5Str;
         String ssh_status = "not set";
@@ -283,7 +172,7 @@ public class SSHIntentService extends IntentService {
         long tStart = System.currentTimeMillis();
         long twait = 0;
 
-        while (go) {
+        while (true) {
 
             tnow = System.currentTimeMillis();
             if ( tnow >= tStart) {
@@ -294,13 +183,8 @@ public class SSHIntentService extends IntentService {
             }
             if ( tElapsed > twait ) {
                 tStart = System.currentTimeMillis();
-                Log.i("SSH :", "handleAction Get Inputs - tElapsed : " + tElapsed);
-                Log.i("SSH :", "handleAction Get Inputs - continueGet :" + continueGet);
+                Log.i("SSH1 :", "handleAction MonIO - tElapsed : " + tElapsed);
                 try {
-                    aStr = aSSH.GetSSHStr("pigs br1");
-                    i2cResp1 = getADCValue( ADC1);
-                    i2cResp2 = getADCValue( ADC2);
-                    i2cResp3 = getADCValue( ADC3);
                     sw5Str = aSSH.GetSSHStr("pigs r 14");
                     if ( prevSW5Value.isEmpty() ) {
                         prevSW5Value = sw5Str;
@@ -310,194 +194,31 @@ public class SSHIntentService extends IntentService {
                             prevSW5Value = sw5Str;
                             if (sw5Str.contains("\n") ) {
                                 sw5Value = sw5Str.substring( 0, 1);
-
+                                aSSH.GetSSHStr("pigs w 18 " + sw5Str);
                             }
                             else {
                                 sw5Value = "Unknown";
                             }
 
                             notifySW5Change(sw5Value);
+                            Log.i("SSH1 :", "handleAction MonIO - SW5 :" + sw5Value);
+
                         }
                     }
-                    ssh_status = "SSH ok 1a";
+                    //ssh_status = "SSH ok 1a";
                 } catch (Exception e) {
-                    aStr = "00000000/n";
-                    ssh_status = "SSH not ok 1";
-                    notifySSHIssue( ssh_status );
-                }
-                Bundle aB = new Bundle();
-                aB.putString(BUNDLE_SSH_STR, aStr);
-                aB.putString(BUNDLE_SSH_I2C_ADC1_STR, i2cResp1);
-                aB.putString(BUNDLE_SSH_I2C_ADC2_STR, i2cResp2);
-                aB.putString(BUNDLE_SSH_I2C_ADC3_STR, i2cResp3);
-                aB.putString(BUNDLE_SSH_STATUS_STR, ssh_status);
-                Message aM = new Message();
-                aM.setData(aB);
-                try {
-                    mActivityMessenger.send(aM);
-                } catch (RemoteException e) {
-                    e.printStackTrace();
+                    //aStr = "00000000/n";
+                    //ssh_status = "SSH not ok 1";
+                    //notifySSHIssue( ssh_status );
+                    Log.i("SSH1 :", "handleAction MonIO - exception");
                 }
                 // wait x sec from now on - it seems android measures in 1/10 of msec!
-                twait = 2500*10;
+                twait = 2500;
             }
 
-            go = continueGet;
+            //go = continueGet;
 
         }
-    }
-
-    private String getADCValue( String i2cAddr) {
-
-        String i2cResp = "";
-
-        try {
-            if ( i2cAddr == ADC1) {
-                // do a read, if it fails (=neg value) initialise device addr
-                i2cResp = aSSH.GetSSHStr( "pigs i2crd " + mAdc1Handle + " 2" );
-                if ( i2cResp.contains("-") ) {
-                    //TODO verify first init of i2c bus
-                    i2cResp = aSSH.GetSSHStr( "pigs i2co 1 " + ADC1 + " 0");
-                    if (i2cResp.contains("\n")) {
-                        mAdc1Handle = i2cResp.substring(0, 1);
-                        i2cResp = aSSH.GetSSHStr( "pigs i2crd " + mAdc1Handle + " 2" );
-                    }
-                }
-            }
-            else if (i2cAddr == ADC2) {
-                // do a write to reg 0 and read 2 bytes, if it fails (=neg value) initialise device addr
-                i2cResp = aSSH.GetSSHStr( "pigs i2cwd " + mAdc2Handle + " 0" +
-                        " i2crd " + mAdc2Handle + " 2");
-                if ( i2cResp.contains("-") ) {
-                    //TODO verify first init of i2c bus
-                    i2cResp = aSSH.GetSSHStr( "pigs i2co 1 " + ADC2 + " 0");
-                    if (i2cResp.contains("\n")) {
-                        mAdc2Handle = i2cResp.substring(0, 1);
-                        //try reading again with a valid handle
-                        i2cResp = aSSH.GetSSHStr( "pigs i2cwd " + mAdc2Handle + " 0" +
-                                " i2crd " + mAdc2Handle + " 2");
-                    }
-                }
-            }
-            else if (i2cAddr == ADC3) {
-                // do a write to reg 0 and read 2 bytes, if it fails (=neg value) initialise device addr
-                i2cResp = aSSH.GetSSHStr( "pigs i2cwd " + mAdc3Handle + " 0" +
-                        " i2crd " + mAdc3Handle + " 2");
-                if ( i2cResp.contains("-") ) {
-                    //TODO verify first init of i2c bus
-                    i2cResp = aSSH.GetSSHStr( "pigs i2co 1 " + ADC3 + " 0");
-                    if (i2cResp.contains("\n")) {
-                        mAdc3Handle = i2cResp.substring(0, 1);
-                        //try reading again with a valid handle
-                        i2cResp = aSSH.GetSSHStr( "pigs i2cwd " + mAdc3Handle + " 0" +
-                                " i2crd " + mAdc3Handle + " 2");
-                    }
-                }
-
-            }
-        } catch ( Exception e) {
-            //ssh failed make return string safe to continue
-            i2cResp = "0\n";
-        }
-        return i2cResp;
-    }
-
-
-    /**
-     * Handle action in the provided background thread with the provided
-     * parameters.
-     */
-    private void handleActionSetOut1() {
-        String aStr;
-
-        Log.i("SSH :", "handleAction Set Out1");
-        try {
-            aStr = aSSH.GetSSHStr("pigs w 16 1 w 17 0 br1");
-        } catch (Exception e) {
-            aStr = "00000000/n";
-            notifySSHIssue( "SSH not ok 2");
-        }
-        Bundle aB = new Bundle();
-        aB.putString(BUNDLE_SSH_STR, aStr);
-        aB.putString(BUNDLE_SSH_STATUS_STR, "SSH OK 2");
-        Message aM = new Message();
-        aM.setData(aB);
-        try {
-            mActivityMessenger.send(aM);
-        } catch (RemoteException e) {
-            e.printStackTrace();
-        }
-//        try {
-//            sleep(100000);
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
-//        }
-
-    }
-
-    /**
-     * Handle action in the provided background thread with the provided
-     * parameters.
-     */
-    private void handleActionSetOut2() {
-        String aStr;
-
-        Log.i("SSH :", "handleAction Set Out2");
-        try {
-            aStr = aSSH.GetSSHStr("pigs w 16 0 w 17 1 br1");
-        } catch (Exception e) {
-            aStr = "00000000/n";
-            notifySSHIssue( "SSH not ok 3");
-        }
-        Bundle aB = new Bundle();
-        aB.putString(BUNDLE_SSH_STR, aStr);
-        aB.putString(BUNDLE_SSH_STATUS_STR, "SSH OK 3");
-        Message aM = new Message();
-        aM.setData(aB);
-        try {
-            mActivityMessenger.send(aM);
-        } catch (RemoteException e) {
-            e.printStackTrace();
-        }
-//        try {
-//            sleep(100000);
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
-//        }
-
-    }
-
-    /**
-     * Handle action in the provided background thread with the provided
-     * parameters.
-     */
-    private void handleActionSetOut3() {
-        String aStr;
-
-        Log.i("SSH :", "handleAction Set Out3");
-        try {
-            aStr = aSSH.GetSSHStr("sudo shutdown -h");
-        } catch (Exception e) {
-            aStr = "00000000/n";
-            notifySSHIssue( "SSH not ok 4");
-        }
-        Bundle aB = new Bundle();
-        aB.putString(BUNDLE_SSH_STR, aStr);
-        aB.putString(BUNDLE_SSH_STATUS_STR, "SSH OK 3");
-        Message aM = new Message();
-        aM.setData(aB);
-        try {
-            mActivityMessenger.send(aM);
-        } catch (RemoteException e) {
-            e.printStackTrace();
-        }
-    }
-    /**
-     * Handle action in the provided background thread with the provided
-     * parameters.
-     */
-    private void changeHost( String newHostIP ) {
-        aSSH.SetHost(newHostIP);
     }
 
     //api issue for notification.builder call
@@ -505,25 +226,11 @@ public class SSHIntentService extends IntentService {
     private void SetupNotification () {
 
         // Prepare intent which is triggered if the notification is selected
-//        Context context = getApplicationContext();
-//        Intent mI = new Intent(Intent.ACTION_VIEW);
-//        //Intent myIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(myBlog));
-//        PendingIntent pI = PendingIntent.getActivity(   getBaseContext(),
-//                (int) System.currentTimeMillis(),
-//                mI,
-//                0);
-        //build notification
-//        myNotification = new Notification.Builder(this, "1")
         mBuilder = new NotificationCompat.Builder(this, "1");
         mBuilder.setContentTitle("PI Notifications")
                 .setContentText("Service started")
                 //.setContentIntent(pI)
                 .setSmallIcon(R.drawable.ic_stat_lock_open);
-        //.addAction(R.drawable.ic_stat_lock_open,"qwerty", pI)
-        //.setAutoCancel(true)
-        //.build();
-
-
         notificationManager = NotificationManagerCompat.from(getApplicationContext());
         notificationManager.notify(MY_NOTIFICATION_ID, mBuilder.build() );
     }
@@ -532,21 +239,6 @@ public class SSHIntentService extends IntentService {
         manageNotificationList("SW 14 state changed to " + valStr );
     }
 
-    private void notifySSHIssue( String ssh_status) {
-
-        manageNotificationList("SSH communication not ok");
-
-        Bundle aB = new Bundle();
-        aB.putString(BUNDLE_SSH_STATUS_STR, ssh_status );
-        Message aM = new Message();
-        aM.setData(aB);
-        try {
-            mActivityMessenger.send(aM);
-        } catch (RemoteException e) {
-            e.printStackTrace();
-        }
-
-    }
 
     private void manageNotificationList( String aStr ) {
 
