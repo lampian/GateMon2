@@ -23,6 +23,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".MainActivity$GetHostActivity">
+        </activity>
         <service
             android:name=".SSHIntentService"
             android:exported="false"

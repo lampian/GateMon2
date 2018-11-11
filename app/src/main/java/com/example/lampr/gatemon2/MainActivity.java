@@ -10,12 +10,13 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Messenger;
+import android.support.v4.app.FragmentActivity;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.ProgressBar;
-import android.widget.RadioButton;
 import android.widget.TextView;
+import android.widget.Toast;
 import android.widget.ToggleButton;
 
 import java.lang.ref.WeakReference;
@@ -174,21 +175,7 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    public void changeHost(View view) {
 
-        String newHostIP = "192.168.1.108";
-        Intent sIntent = new Intent();
-        sendBroadcast(sIntent);
-
-        RadioButton mRB2 = findViewById(R.id.ip2); // initiate a radio button
-        Boolean mRB2Set = mRB2.isChecked(); // check current state of a radio button (true or false).
-        if (mRB2Set) {
-            newHostIP = "192.168.1.125";
-        }
-        Messenger messengerIncoming = new Messenger(mHandler);
-        SSH2IntentService.startSSH2Service(this, ACTION_CHANGE_HOST, messengerIncoming, newHostIP);
-        Log.i("SSH2 :", "ScheduleJob change host");
-    }
 
     public void shutdownDevice(View view) {
         Intent sIntent = new Intent();
@@ -204,6 +191,48 @@ public class MainActivity extends AppCompatActivity {
         //mIntent.startActionGetInputs( this, messengerIncoming, "" );
 
     }
+
+    public void setLed18(View view) {
+    }
+
+    public void setLed19(View view) {
+    }
+
+    public void changeIP(View view) {
+
+        // launch a new activity to display
+        // the dialog fragment with selected text.
+        // That is: if this is a single-pane (e.g., portrait mode on a
+        // phone) then fire DetailsActivity to display the details
+        // fragment
+
+        // Create an intent for starting the DetailsActivity
+        Intent intent = new Intent();
+
+        // explicitly set the activity context and class
+        // associated with the intent (context, class)
+//        intent.setClass(getActivity(), GetHostActivity.class);
+        intent.setClass( this, GetHostActivity.class);
+
+        // pass the current position
+//        intent.putExtra("index", 1);
+
+        startActivity(intent);
+
+
+    }
+
+//    public void changeHost(View view) {
+//        String newHostIP = "192.168.1.108";
+//
+//        RadioButton mRB2 = findViewById(R.id.ip2); // initiate a radio button
+//        Boolean mRB2Set = mRB2.isChecked(); // check current state of a radio button (true or false).
+//        if (mRB2Set) {
+//            newHostIP = "192.168.1.125";
+//        }
+//        Messenger messengerIncoming = new Messenger(mHandler);
+//        SSH2IntentService.startSSH2Service(this, ACTION_CHANGE_HOST, messengerIncoming, newHostIP);
+//    }
 
 
     /**
@@ -428,6 +457,104 @@ public class MainActivity extends AppCompatActivity {
             }
 
         }
+    }
+
+
+
+    // This is a secondary activity, to show what the user has selected when the
+    // screen is not large enough to show it all in one activity.
+
+    public static class GetHostActivity extends FragmentActivity {
+
+        private static final String TAG = "GetHostACTIVITY";
+
+        public GetHostActivity() {
+            super();
+        }
+
+        @Override
+        protected void onCreate(Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+
+            Log.d(TAG, " onCreate()");
+
+            Toast.makeText(this, "GetHostActivity", Toast.LENGTH_SHORT).show();
+
+            setContentView(R.layout.fragment_get_host);
+
+
+//            if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
+//                // If the screen is now in landscape mode, we can show the
+//                // dialog in-line with the list so we don't need this activity.
+//                finish();
+//                return;
+//            }
+
+            if (savedInstanceState == null) {
+                // During initial setup, plug in the details fragment.
+
+                // create fragment
+//                GetHostFragment aGetHostFragment = new GetHostFragment();
+
+                // get and set the position input by user (i.e., "index")
+                // which is the construction arguments for this fragment
+//                aGetHostFragment.setArguments(getIntent().getExtras());
+
+                //
+//                getFragmentManager().beginTransaction()
+//                        .add(, aGetHostFragment).commit();
+
+//                GetHostFragment getHostFragment = new GetHostFragment();
+//                getSupportFragmentManager().beginTransaction().add(R.id.container, getHostFragment).commit();
+    //                setContentView(R.layout.fragment_get_host);
+
+                GetHostFragment getHostFragment = new GetHostFragment();
+                //container -> contents???
+                getSupportFragmentManager().beginTransaction().add(R.id.container, getHostFragment).commit();
+//                setContentView(R.layout.fragment_get_host);
+            }
+        }
+
+        // GetHostActivity Lifecycle
+
+        @Override
+        protected void onStart() {
+            //setContentView(R.layout.fragment_get_host);
+            super.onStart();
+            Log.d(TAG, " onStart()");
+        }
+
+        @Override
+        protected void onResume() {
+            super.onResume();
+            Log.d(TAG, " onResume()");
+        }
+
+        @Override
+        protected void onPause() {
+            super.onPause();
+            Log.d(TAG, " onPause()");
+        }
+
+        @Override
+        protected void onStop() {
+            super.onStop();
+            Log.d(TAG, " onStop()");
+        }
+
+        @Override
+        protected void onDestroy() {
+            super.onDestroy();
+            Log.d(TAG, " onDestroy()");
+        }
+
+        @Override
+        protected void onRestart() {
+            super.onRestart();
+            Log.d(TAG, " onRestart()");
+        }
+
+
     }
 
 

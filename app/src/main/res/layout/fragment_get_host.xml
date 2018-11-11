@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/fragment_get_host"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".GetHostFragment">
+    <!--tools:context=".GetHostFragment"> -->
+
+    <!-- TODO: Update blank fragment layout -->
+    <fragment
+        android:id="@+id/get_host"
+        class="com.example.lampr.gatemon2.GetHostFragment"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Set Host IP field"
+            tools:layout_margin="6dp" />
+
+        <RadioGroup
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <RadioButton
+                android:id="@+id/ip1"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:text="pi@192.168.1.108" />
+
+            <RadioButton
+                android:id="@+id/ip2"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:text="pi@192.168.1.125" />
+        </RadioGroup>
+
+
+    </LinearLayout>
+
+
+
+</FrameLayout>
