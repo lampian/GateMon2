@@ -7,33 +7,52 @@
     android:orientation="vertical"
     tools:context=".MainActivity">
 
-    <TextView
-        android:id="@+id/ssh_status"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        android:layout_marginBottom="16dp"
-        android:padding="8dp"
-        android:text="SSH Status"
-        android:background="@android:color/holo_green_light"
+        android:orientation="horizontal"
+        android:layout_margin="3dp"
         android:textAlignment="center"
-        android:textStyle="bold" />
-    <RadioGroup
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content">
-        <RadioButton
-            android:id="@+id/ip1"
+        android:textStyle="bold">
+
+        <TextView
+            android:id="@+id/ssh_status"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/borders"
+            android:gravity="center_vertical"
+            android:padding="3dp"
+            android:paddingTop="16dp"
+            android:text="SSH Status"
+            android:textAlignment="center"
+            android:textAppearance="@style/TextAppearance.AppCompat.Button"
+            android:textColor="@android:color/black" />
+
+        <TextView
+            android:id="@+id/ip_used"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="2"
+            android:background="@drawable/borders"
+            android:gravity="center_vertical|center_horizontal"
+            android:padding="3dp"
+            android:paddingTop="16dp"
             android:text="pi@192.168.1.108"
-            android:onClick="changeHost"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-        <RadioButton
-            android:id="@+id/ip2"
-            android:text="pi@192.168.1.125"
-            android:onClick="changeHost"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-    </RadioGroup>
+            android:textAppearance="@style/TextAppearance.AppCompat.Button"
+            android:textColor="@android:color/black" />
+
+        <Button
+            android:id="@+id/select_ip"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/borders"
+            android:backgroundTint="@android:color/holo_green_light"
+            android:onClick="selectIP"
+            android:text="Select IP"
+            android:textColor="@android:color/black" />
+    </LinearLayout>
 
     <TextView
         android:layout_width="match_parent"

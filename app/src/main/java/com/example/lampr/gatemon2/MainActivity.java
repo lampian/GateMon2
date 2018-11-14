@@ -1,10 +1,15 @@
 package com.example.lampr.gatemon2;
 
+import android.app.AlertDialog;
 import android.app.job.JobInfo;
 import android.app.job.JobScheduler;
 import android.content.ComponentName;
+import android.content.ContentValues;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
@@ -12,13 +17,23 @@ import android.os.Message;
 import android.os.Messenger;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ProgressBar;
-import android.widget.RadioButton;
 import android.widget.TextView;
 import android.widget.ToggleButton;
 
+import com.example.lampr.gatemon2.data.hostDataHelper;
+import com.example.lampr.gatemon2.data.hosts;
+
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
+import java.util.List;
 
 import static com.example.lampr.gatemon2.SSH2IntentService.ACTION_CHANGE_HOST;
 import static com.example.lampr.gatemon2.SSH2IntentService.ACTION_GET_INPUTS;
@@ -33,7 +48,13 @@ import static com.example.lampr.gatemon2.SSH2IntentService.BUNDLE_SSH_STR;
 
 public class MainActivity extends AppCompatActivity {
 
+    int mIPSelected = 0;
+    boolean updateHostInfo = true;
     //private ComponentName mServiceComponent;
+
+    //get host preferences from db
+    Bundle prefBundle = getHostPrefFromDB();
+
 
     // Handler for incoming messages from the service.
     private IncomingMessageHandler mHandler;
@@ -124,6 +145,52 @@ public class MainActivity extends AppCompatActivity {
         super.onStop();
     }
 
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.overflowmenu,menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id.insert_dummy_data:
+                insertDummyData();
+                return  true;
+            case R.id.delete_data:
+                clearDB();
+                return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    private void insertDummyData() {
+        long rowID;
+        hostDataHelper mhostDataHelper  = new hostDataHelper(this);
+        SQLiteDatabase db = mhostDataHelper.getWritableDatabase();
+        //put data into Hostdata table
+        ContentValues hostValues = new ContentValues();
+        hostValues.put(hosts.HostData.HOST_IP, "192.168.1.125");
+        hostValues.put(hosts.HostData.HOST_NAME, "PI");
+        hostValues.put(hosts.HostData.HOST_PORT, "22");
+        rowID = db.insert(hosts.HostData.TABLE_NAME, null, hostValues);
+        Log.i("SSHDB", "insertDummyData: " + rowID);
+
+        //put data into HostPrefData table
+        ContentValues hostPrefValues = new ContentValues();
+        hostPrefValues.put(hosts.HostPrefData.HOST_NAME, "PIZW001");
+        hostPrefValues.put(hosts.HostPrefData.HOST_PREF, 0);
+        rowID = db.insert(hosts.HostPrefData.TABLE_NAME, null, hostPrefValues);
+        Log.i("SSHDB", "insertDummyPrefData: " + rowID);
+
+    }
+
+    private void    clearDB() {
+        hostDataHelper mhostDataHelper  = new hostDataHelper(this);
+        SQLiteDatabase db = mhostDataHelper.getWritableDatabase();
+        hostDataHelper.deleteEntries(db);
+    }
+
     public void setLed16(View view) {
 
         String tbTxt;
@@ -174,22 +241,6 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    public void changeHost(View view) {
-
-        String newHostIP = "192.168.1.108";
-        Intent sIntent = new Intent();
-        sendBroadcast(sIntent);
-
-        RadioButton mRB2 = findViewById(R.id.ip2); // initiate a radio button
-        Boolean mRB2Set = mRB2.isChecked(); // check current state of a radio button (true or false).
-        if (mRB2Set) {
-            newHostIP = "192.168.1.125";
-        }
-        Messenger messengerIncoming = new Messenger(mHandler);
-        SSH2IntentService.startSSH2Service(this, ACTION_CHANGE_HOST, messengerIncoming, newHostIP);
-        Log.i("SSH2 :", "ScheduleJob change host");
-    }
-
     public void shutdownDevice(View view) {
         Intent sIntent = new Intent();
         //sIntent.setAction(SSHIntentService.StopReceiver.ACTION_STOP);
@@ -205,6 +256,216 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    // selectIp creates a AlertDialog that enables user to:
+    // (1) return from dialog with no changes to ip selection,
+    // (2) add a host to the host db
+    // (3) select a host from the current db
+    // The host db is support by host.java and hostDataHelper.java
+    // the current selected host ip is held by mIPSelected
+    //The ip is displayed in ip_used textView
+    public void selectIP(View view) {
+
+        Log.i("SSH :", "SelectIP()");
+        //final TextView ipUsed = (TextView) findViewById(R.id.ip_used);
+
+        //prepare AlertDialog
+        AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+        LayoutInflater inflater = getLayoutInflater();
+        View dialogView = inflater.inflate(R.layout.alertdialog_custom_view, null);
+        builder.setCancelable(false);
+        builder.setView(dialogView);
+
+        //------------------list
+        ArrayAdapter aAA = getHostDataFromDB();
+        // Set a single choice items list for alert dialog
+        builder.setSingleChoiceItems(
+                aAA, // Items list
+                -1, // Index of checked item (-1 = no selection)
+                new DialogInterface.OnClickListener() // Item click listener
+                {
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int i) {
+                        // Get the alert dialog selected item's text
+                        Log.i("SSHDB", "onClick: " + i);
+                        mIPSelected = i;
+
+                    }
+                });
+        //------------------list
+        Button btnPos = dialogView.findViewById(R.id.dialog_positive_btn);
+        Button btnNeg = dialogView.findViewById(R.id.dialog_negative_btn);
+        Button btnAdd = dialogView.findViewById(R.id.dialog_neutral_btn);
+        final EditText et_name = dialogView.findViewById(R.id.et_name);
+        final EditText et_ip = dialogView.findViewById(R.id.et_ip);
+        final EditText et_port = dialogView.findViewById(R.id.et_port);
+        final AlertDialog dialog = builder.create();
+        btnPos.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.cancel();
+                updateHostPrefInDB();
+                updateHostInfo = true;
+            }
+        });
+        btnNeg.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.dismiss();
+            }
+        });
+        btnAdd.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                //TODO if fields empty dont end dialog, get user to add data
+                String newName = et_name.getText().toString(); //TODO think about using trim()
+                String newIP = et_ip.getText().toString();
+                String newPort = et_port.getText().toString();
+                ContentValues hostValues = new ContentValues();
+                hostValues.put(hosts.HostData.HOST_IP, newIP);
+                hostValues.put(hosts.HostData.HOST_NAME, newName);
+                hostValues.put(hosts.HostData.HOST_PORT, newPort);
+                mIPSelected = addHosttoDB( hostValues);
+                prefBundle = getHostPrefFromDB();
+                updateHostInfo = true;
+                updateHostPrefInDB();
+                dialog.cancel();
+            }
+        });
+        dialog.show();
+    }
+
+    private int addHosttoDB(ContentValues hostValues) {
+        long newRow;
+        hostDataHelper mhostDataHelper  = new hostDataHelper(this);
+        SQLiteDatabase db = mhostDataHelper.getWritableDatabase();
+        newRow = db.insert(hosts.HostData.TABLE_NAME, null, hostValues);
+        Log.i("SSHDB", "addHosttoDB: " + newRow);
+        return ((int) newRow);
+    }
+
+    private ArrayAdapter getHostDataFromDB() {
+        int noRows;
+
+        String[] projection = {
+            hosts.HostData._ID,
+            hosts.HostData.HOST_NAME,
+            hosts.HostData.HOST_IP,
+            hosts.HostData.HOST_PORT,
+            hosts.HostData.HOST_PW
+        };
+
+        hostDataHelper mhostDataHelper  = new hostDataHelper(this);
+        SQLiteDatabase db = mhostDataHelper.getReadableDatabase();
+
+        Cursor cursor = db.query(
+          hosts.HostData.TABLE_NAME,
+          projection,
+          null,
+          null,
+          null,
+          null,
+          null
+        );
+
+        noRows = cursor.getCount();
+        Log.i("SSHDB", "getHostDataFromDB: nr rows =" + noRows);
+        List items = new ArrayList<>();
+        while (cursor.moveToNext()) {
+            String aIP = cursor.getString( cursor.getColumnIndexOrThrow(hosts.HostData.HOST_IP));
+            items.add(aIP);
+        }
+        cursor.close();
+        // Initialize a new array adapter instance
+        ArrayAdapter arrayAdapter = new ArrayAdapter<String>(
+                this, // Context
+                android.R.layout.simple_list_item_single_choice, // Layout
+                items // List
+        );
+
+        return arrayAdapter;
+    }
+
+    private Bundle getHostPrefFromDB() {
+        int noRows;
+        int selection;
+
+        String[] projection = {
+                hosts.HostPrefData.HOST_PREF
+        };
+
+        hostDataHelper mhostDataHelper  = new hostDataHelper(this);
+        SQLiteDatabase db = mhostDataHelper.getReadableDatabase();
+
+        Cursor cursor = db.query(
+                hosts.HostPrefData.TABLE_NAME,
+                projection,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+
+        if (cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            selection = cursor.getInt(cursor.getColumnIndex(hosts.HostPrefData.HOST_PREF));
+        }
+        else {
+            selection = 0;
+        }
+        Log.i("SSHDB", "getHostDataFromDB: pref =" + selection);
+
+        //get information from hostdata pointed to by selection in hostprefdata
+        String[] projection2 = {
+                hosts.HostData._ID,
+                hosts.HostData.HOST_NAME,
+                hosts.HostData.HOST_USER_NAME,
+                hosts.HostData.HOST_IP,
+                hosts.HostData.HOST_PORT,
+                hosts.HostData.HOST_PW
+        };
+
+        cursor = db.query(
+            hosts.HostData.TABLE_NAME,
+            projection2,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+
+        cursor.moveToPosition(selection);
+        Bundle aB = new Bundle();
+        aB.putString(hosts.HostData.HOST_NAME,
+                cursor.getString( cursor.getColumnIndexOrThrow(hosts.HostData.HOST_NAME)));
+        aB.putString(hosts.HostData.HOST_USER_NAME,
+                cursor.getString( cursor.getColumnIndexOrThrow(hosts.HostData.HOST_USER_NAME)));
+        aB.putString(hosts.HostData.HOST_IP,
+                cursor.getString( cursor.getColumnIndexOrThrow(hosts.HostData.HOST_IP)));
+        aB.putString(hosts.HostData.HOST_PORT,
+                cursor.getString( cursor.getColumnIndexOrThrow(hosts.HostData.HOST_PORT)));
+        aB.putString(hosts.HostData.HOST_PW,
+                cursor.getString( cursor.getColumnIndexOrThrow(hosts.HostData.HOST_PW)));
+        aB.putString(hosts.HostData.HOST_NAME,
+                cursor.getString( cursor.getColumnIndexOrThrow(hosts.HostData.HOST_NAME)));
+
+        Log.i("SSHDB", " getHostPrefDataFromDB: row nr =" + selection);
+
+        cursor.close();
+
+        return aB;
+    }
+
+    private void updateHostPrefInDB() {
+
+        hostDataHelper mhostDataHelper  = new hostDataHelper(this);
+        SQLiteDatabase db = mhostDataHelper.getWritableDatabase();
+        hostDataHelper.updateRecord(db, hosts.HostPrefData.TABLE_NAME,
+                hosts.HostPrefData.HOST_PREF,
+                "0",
+                Integer.toString(mIPSelected));
+    }
 
     /**
      * A {@link Handler} allows you to send messages associated with a thread. A {@link Messenger}
@@ -398,6 +659,13 @@ public class MainActivity extends AppCompatActivity {
 
             TextView tv5 = findViewById(R.id.ssh_status);
             tv5.setText( aSSHStatus );
+
+            TextView ipUsed = (TextView) findViewById(R.id.ip_used);
+            if (updateHostInfo) {
+                String aIP = prefBundle.getString(hosts.HostData.HOST_IP);
+                ipUsed.setText( aIP );
+                updateHostInfo = false;
+            }
 
             //make toggle button red if the shown and actual state of the bit differs,
             //make toglle button green of the shown and actual state are the same, ie Off and 0
