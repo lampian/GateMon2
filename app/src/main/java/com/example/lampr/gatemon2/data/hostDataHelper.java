@@ -38,9 +38,16 @@ public class hostDataHelper extends SQLiteOpenHelper {
     }
 
     public static void updateRecord(SQLiteDatabase db, String aTable, String aCol, String aRow, String val){
-        db.execSQL("UPDATE " + aTable +
+        String updateStr = "UPDATE " + aTable +
                 " SET " + aCol + " = " + val +
-                " WHERE _ID = " + aRow );
+                " WHERE _ID = " + aRow;
+        db.execSQL( updateStr);
+        Log.i("SSHDB ", "updateRecord :" + updateStr);
 
+    }
+    public static void deleteRecord(SQLiteDatabase db, String aTable, String ID){
+        String deleteStr = "DELETE FROM " + aTable + " WHERE _ID = " + ID;
+        db.execSQL( deleteStr);
+        Log.i("SSHDB ", "DeleteRecord :" + "ID = " + ID + " result = " );
     }
 }

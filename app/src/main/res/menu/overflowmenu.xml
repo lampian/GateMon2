@@ -10,5 +10,9 @@
         android:id="@+id/delete_data"
         android:title="Delete db data"
         app:showAsAction="never"/>
+    <item
+        android:id="@+id/update_ref_data"
+        android:title="Update ref data"
+        app:showAsAction="never"/>
 </menu>
 

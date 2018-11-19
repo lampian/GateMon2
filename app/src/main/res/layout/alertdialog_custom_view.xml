@@ -6,6 +6,7 @@
     android:layout_height="match_parent"
     android:background="#e9f1ba"
     android:padding="10dp"
+    android:textSize="10dp"
     tools:context=".MainActivity">
 
     <TextView
@@ -14,52 +15,51 @@
         android:layout_height="wrap_content"
         android:background="#d5dda6"
         android:padding="5dp"
-        android:text="Select/Add IP"
-        android:textSize="15dp" />
+        android:text="Select/Add IP" />
 
     <EditText
         android:id="@+id/et_name"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@id/dialog_title"
-        android:hint="Add host name"
-        android:textSize="15dp" />
+        android:hint="Add host name eg PIZW00x" />
 
     <EditText
         android:id="@+id/et_ip"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@id/et_name"
-        android:hint="Add host ip"
-        android:textSize="15dp" />
+        android:hint="Add host ip eg 192..." />
 
     <EditText
         android:id="@+id/et_port"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@id/et_ip"
-        android:hint="Add host port"
-        android:textSize="15dp" />
+        android:hint="Add host port eg 22" />
+    <EditText
+        android:id="@+id/et_user"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/et_port"
+        android:hint="Add user name eg PI" />
+    <EditText
+        android:id="@+id/et_pw"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/et_user"
+        android:hint="Add user password" />
 
 
     <Button
         android:id="@+id/dialog_positive_btn"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_below="@id/et_port"
+        android:layout_below="@id/et_pw"
         android:layout_alignParentRight="true"
         android:background="#dde5ad"
         android:text="Accept" />
 
-    <Button
-        android:id="@+id/dialog_negative_btn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignBaseline="@id/dialog_positive_btn"
-        android:layout_marginRight="3dp"
-        android:layout_toLeftOf="@id/dialog_neutral_btn"
-        android:background="#dde5ad"
-        android:text="No change" />
     <Button
         android:id="@+id/dialog_neutral_btn"
         android:layout_width="wrap_content"
@@ -69,4 +69,22 @@
         android:layout_toLeftOf="@id/dialog_positive_btn"
         android:background="#dde5ad"
         android:text="Add item"/>
+    <Button
+        android:id="@+id/dialog_negative_btn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@id/dialog_neutral_btn"
+        android:layout_marginRight="3dp"
+        android:layout_toLeftOf="@id/dialog_neutral_btn"
+        android:background="#dde5ad"
+        android:text="No change" />
+    <Button
+        android:id="@+id/dialog_delete_btn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@+id/dialog_negative_btn"
+        android:layout_marginRight="3dp"
+        android:layout_toLeftOf="@id/dialog_negative_btn"
+        android:background="#dde5ad"
+        android:text="Delete item"/>
 </RelativeLayout>

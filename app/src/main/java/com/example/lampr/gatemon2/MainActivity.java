@@ -16,6 +16,8 @@ import android.os.Handler;
 import android.os.Message;
 import android.os.Messenger;
 import android.support.v7.app.AppCompatActivity;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -48,12 +50,12 @@ import static com.example.lampr.gatemon2.SSH2IntentService.BUNDLE_SSH_STR;
 
 public class MainActivity extends AppCompatActivity {
 
-    int mIPSelected = 0;
+    int mIPSelected = 1;
+    //int mIPSelectedNew = 1;
     boolean updateHostInfo = true;
+    Bundle prefBundle;
     //private ComponentName mServiceComponent;
 
-    //get host preferences from db
-    Bundle prefBundle = getHostPrefFromDB();
 
 
     // Handler for incoming messages from the service.
@@ -78,6 +80,8 @@ public class MainActivity extends AppCompatActivity {
         //use job scheduler to handle ssh monitoring function which must stay alive
         scheduleJob();
 
+        //get host preferences from db
+        prefBundle = getHostPrefFromDB();
 
     }
 
@@ -158,6 +162,10 @@ public class MainActivity extends AppCompatActivity {
                 insertDummyData();
                 return  true;
             case R.id.delete_data:
+                clearDB();
+                return true;
+            case R.id.update_ref_data:
+                updateHostPrefInDB();
                 clearDB();
                 return true;
         }
@@ -260,11 +268,10 @@ public class MainActivity extends AppCompatActivity {
     // (1) return from dialog with no changes to ip selection,
     // (2) add a host to the host db
     // (3) select a host from the current db
-    // The host db is support by host.java and hostDataHelper.java
+    // The host db is supported by host.java and hostDataHelper.java
     // the current selected host ip is held by mIPSelected
     //The ip is displayed in ip_used textView
     public void selectIP(View view) {
-
         Log.i("SSH :", "SelectIP()");
         //final TextView ipUsed = (TextView) findViewById(R.id.ip_used);
 
@@ -276,34 +283,75 @@ public class MainActivity extends AppCompatActivity {
         builder.setView(dialogView);
 
         //------------------list
-        ArrayAdapter aAA = getHostDataFromDB();
+        final ArrayAdapter aAA = getHostDataFromDB();
         // Set a single choice items list for alert dialog
         builder.setSingleChoiceItems(
-                aAA, // Items list
-                -1, // Index of checked item (-1 = no selection)
-                new DialogInterface.OnClickListener() // Item click listener
-                {
-                    @Override
-                    public void onClick(DialogInterface dialogInterface, int i) {
-                        // Get the alert dialog selected item's text
-                        Log.i("SSHDB", "onClick: " + i);
-                        mIPSelected = i;
+            aAA, // Items list
+            mIPSelected - 1, // Index of checked item (-1 = no selection)
+            new DialogInterface.OnClickListener() // Item click listener
+            {
+                @Override
+                public void onClick(DialogInterface dialogInterface, int i) {
+                    // Get the alert dialog selected item's text
+                    //note that the index retuned is that of the list and not the _ID
+                    //translate index to _ID by i++ - not ideal but ok for now
+                    //mIPSelectedNew = i;
+                    // get id of selection
+                    String aStr = aAA.getItem(i).toString();
+                    int indexA = aStr.indexOf(":", 0);
+                    aStr = aStr.substring(0, indexA);
+                    int aInt = Integer.parseInt(aStr);
+                    mIPSelected = aInt;
+                    Log.i("SSHDB", "SingleChoisDialog onClick: " + i + " & _ID: " + mIPSelected);
 
-                    }
-                });
+                }
+            }
+        );
         //------------------list
         Button btnPos = dialogView.findViewById(R.id.dialog_positive_btn);
         Button btnNeg = dialogView.findViewById(R.id.dialog_negative_btn);
-        Button btnAdd = dialogView.findViewById(R.id.dialog_neutral_btn);
+        final Button btnAdd = dialogView.findViewById(R.id.dialog_neutral_btn);
+        btnAdd.setEnabled(false);
+        Button btnDel = dialogView.findViewById(R.id.dialog_delete_btn);
         final EditText et_name = dialogView.findViewById(R.id.et_name);
+        //listner's exclusive task it to enable add button once user has typed in text
+        //no checking of fields yet
+        et_name.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                btnAdd.setEnabled(true);
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+
+            }
+        } );
+
         final EditText et_ip = dialogView.findViewById(R.id.et_ip);
         final EditText et_port = dialogView.findViewById(R.id.et_port);
+        final EditText et_user = dialogView.findViewById(R.id.et_user);
+        final EditText et_pw = dialogView.findViewById(R.id.et_pw);
         final AlertDialog dialog = builder.create();
+        btnDel.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialog.cancel();
+                //use mIPselected selected by user.
+                removeItemFromDB(mIPSelected);
+            }
+        });
         btnPos.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 dialog.cancel();
                 updateHostPrefInDB();
+                prefBundle = getHostPrefFromDB();
                 updateHostInfo = true;
             }
         });
@@ -317,21 +365,34 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 //TODO if fields empty dont end dialog, get user to add data
+                //TODO add btn should be inactive until text fields are filled by user
                 String newName = et_name.getText().toString(); //TODO think about using trim()
                 String newIP = et_ip.getText().toString();
                 String newPort = et_port.getText().toString();
+                String newUser = et_user.getText().toString();
+                String newPW = et_pw.getText().toString();
                 ContentValues hostValues = new ContentValues();
                 hostValues.put(hosts.HostData.HOST_IP, newIP);
                 hostValues.put(hosts.HostData.HOST_NAME, newName);
                 hostValues.put(hosts.HostData.HOST_PORT, newPort);
+                hostValues.put(hosts.HostData.HOST_USER_NAME,newUser);
+                hostValues.put(hosts.HostData.HOST_PW,newPW);
                 mIPSelected = addHosttoDB( hostValues);
+                updateHostPrefInDB();
                 prefBundle = getHostPrefFromDB();
                 updateHostInfo = true;
-                updateHostPrefInDB();
+                //updateHostPrefInDB();
                 dialog.cancel();
             }
         });
         dialog.show();
+    }
+
+    private void removeItemFromDB(int aID) {
+        hostDataHelper mhostDataHelper  = new hostDataHelper(this);
+        SQLiteDatabase db = mhostDataHelper.getWritableDatabase();
+        int noRowsDeleted = db.delete(hosts.HostData.TABLE_NAME,hosts.HostData._ID + " = " + mIPSelected, null);
+        Log.i("SSHDB", "removeItemFromDB: no rpws deleted " + noRowsDeleted);
     }
 
     private int addHosttoDB(ContentValues hostValues) {
@@ -342,7 +403,7 @@ public class MainActivity extends AppCompatActivity {
         Log.i("SSHDB", "addHosttoDB: " + newRow);
         return ((int) newRow);
     }
-
+    // get all host entries in db and pack into a arrayadapter
     private ArrayAdapter getHostDataFromDB() {
         int noRows;
 
@@ -357,22 +418,30 @@ public class MainActivity extends AppCompatActivity {
         hostDataHelper mhostDataHelper  = new hostDataHelper(this);
         SQLiteDatabase db = mhostDataHelper.getReadableDatabase();
 
-        Cursor cursor = db.query(
-          hosts.HostData.TABLE_NAME,
-          projection,
-          null,
-          null,
-          null,
-          null,
-          null
-        );
-
+        Cursor cursor;
+        try {
+            cursor = db.query(
+                    hosts.HostData.TABLE_NAME,
+                    projection,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+            );
+        } catch (Exception e) {
+            Log.i("SSHDB", "getHostDataFromDB: cursur issue ");
+            ArrayAdapter aAA = null;
+            return aAA;
+        }
         noRows = cursor.getCount();
         Log.i("SSHDB", "getHostDataFromDB: nr rows =" + noRows);
         List items = new ArrayList<>();
         while (cursor.moveToNext()) {
+            String aID = cursor.getString( cursor.getColumnIndexOrThrow(hosts.HostData._ID));
             String aIP = cursor.getString( cursor.getColumnIndexOrThrow(hosts.HostData.HOST_IP));
-            items.add(aIP);
+            String newStr = aID + ": " + aIP;
+            items.add(newStr);
         }
         cursor.close();
         // Initialize a new array adapter instance
@@ -390,28 +459,44 @@ public class MainActivity extends AppCompatActivity {
         int selection;
 
         String[] projection = {
+                hosts.HostPrefData._ID,
                 hosts.HostPrefData.HOST_PREF
         };
 
         hostDataHelper mhostDataHelper  = new hostDataHelper(this);
         SQLiteDatabase db = mhostDataHelper.getReadableDatabase();
+        Cursor cursor;
+        try {
+            cursor = db.query(
+                    hosts.HostPrefData.TABLE_NAME,
+                    projection,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+            );
+        } catch (Exception e) {
+            Log.i("SSHDB", "getHostPrefFromDB: cursur issue");
+            mIPSelected = 1;// add record to host db returns 1 on first add???
+            updateHostPrefInDB();
+            Bundle aB = new Bundle();
+            aB.putString(hosts.HostData.HOST_NAME, "no name");
+            aB.putString(hosts.HostData.HOST_USER_NAME, "no user");
+            aB.putString(hosts.HostData.HOST_IP, "no ip");
+            aB.putString(hosts.HostData.HOST_PORT, "no port");
+            aB.putString(hosts.HostData.HOST_PW, "no pw");
+            aB.putString(hosts.HostData.HOST_NAME, "no host name");
+            return aB;
 
-        Cursor cursor = db.query(
-                hosts.HostPrefData.TABLE_NAME,
-                projection,
-                null,
-                null,
-                null,
-                null,
-                null
-        );
+        }
 
         if (cursor.getCount() > 0) {
             cursor.moveToFirst();
             selection = cursor.getInt(cursor.getColumnIndex(hosts.HostPrefData.HOST_PREF));
         }
         else {
-            selection = 0;
+            selection = 1; //first _id in table seems to be 1 and not 0 after first add of record
         }
         Log.i("SSHDB", "getHostDataFromDB: pref =" + selection);
 
@@ -435,24 +520,41 @@ public class MainActivity extends AppCompatActivity {
             null
         );
 
-        cursor.moveToPosition(selection);
         Bundle aB = new Bundle();
-        aB.putString(hosts.HostData.HOST_NAME,
-                cursor.getString( cursor.getColumnIndexOrThrow(hosts.HostData.HOST_NAME)));
-        aB.putString(hosts.HostData.HOST_USER_NAME,
-                cursor.getString( cursor.getColumnIndexOrThrow(hosts.HostData.HOST_USER_NAME)));
-        aB.putString(hosts.HostData.HOST_IP,
-                cursor.getString( cursor.getColumnIndexOrThrow(hosts.HostData.HOST_IP)));
-        aB.putString(hosts.HostData.HOST_PORT,
-                cursor.getString( cursor.getColumnIndexOrThrow(hosts.HostData.HOST_PORT)));
-        aB.putString(hosts.HostData.HOST_PW,
-                cursor.getString( cursor.getColumnIndexOrThrow(hosts.HostData.HOST_PW)));
-        aB.putString(hosts.HostData.HOST_NAME,
-                cursor.getString( cursor.getColumnIndexOrThrow(hosts.HostData.HOST_NAME)));
-
+        if  (cursor.getCount() > 0) {
+            String query = "select * from " + hosts.HostData.TABLE_NAME +
+                    " where "+ hosts.HostData._ID + " = " + Integer.toString(selection) + " ";
+            cursor = db.rawQuery(query, null);
+            cursor.moveToNext();
+            //de constructed steps to help with debug on first column
+            int  col = cursor.getColumnIndexOrThrow(hosts.HostData.HOST_NAME);
+            String valStr = cursor.getString(col);
+            aB.putString(hosts.HostData.HOST_NAME, valStr);
+//            aB.putString(hosts.HostData.HOST_NAME,
+//                    cursor.getString(cursor.getColumnIndexOrThrow(hosts.HostData.HOST_NAME)));
+            aB.putString(hosts.HostData.HOST_USER_NAME,
+                    cursor.getString(cursor.getColumnIndexOrThrow(hosts.HostData.HOST_USER_NAME)));
+            aB.putString(hosts.HostData.HOST_IP,
+                    cursor.getString(cursor.getColumnIndexOrThrow(hosts.HostData.HOST_IP)));
+            aB.putString(hosts.HostData.HOST_PORT,
+                    cursor.getString(cursor.getColumnIndexOrThrow(hosts.HostData.HOST_PORT)));
+            aB.putString(hosts.HostData.HOST_PW,
+                    cursor.getString(cursor.getColumnIndexOrThrow(hosts.HostData.HOST_PW)));
+            aB.putString(hosts.HostData.HOST_NAME,
+                    cursor.getString(cursor.getColumnIndexOrThrow(hosts.HostData.HOST_NAME)));
+        }
+        else {
+            aB.putString(hosts.HostData.HOST_NAME, "no name");
+            aB.putString(hosts.HostData.HOST_USER_NAME, "no user");
+            aB.putString(hosts.HostData.HOST_IP, "no ip");
+            aB.putString(hosts.HostData.HOST_PORT, "no port");
+            aB.putString(hosts.HostData.HOST_PW, "no pw");
+            aB.putString(hosts.HostData.HOST_NAME, "no host name");
+        }
         Log.i("SSHDB", " getHostPrefDataFromDB: row nr =" + selection);
 
         cursor.close();
+        mIPSelected = selection;
 
         return aB;
     }
@@ -461,10 +563,34 @@ public class MainActivity extends AppCompatActivity {
 
         hostDataHelper mhostDataHelper  = new hostDataHelper(this);
         SQLiteDatabase db = mhostDataHelper.getWritableDatabase();
-        hostDataHelper.updateRecord(db, hosts.HostPrefData.TABLE_NAME,
-                hosts.HostPrefData.HOST_PREF,
-                "0",
-                Integer.toString(mIPSelected));
+        String[] projection = {
+                hosts.HostPrefData._ID,
+                hosts.HostPrefData.HOST_PREF
+        };
+        Cursor cursor = db.query(
+                hosts.HostPrefData.TABLE_NAME,
+                projection,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+
+        if (cursor.getCount() > 0) {
+            //at least one recors in table - update
+            hostDataHelper.updateRecord(db, hosts.HostPrefData.TABLE_NAME,
+                    hosts.HostPrefData.HOST_PREF,
+                    "1", //TODO check if 0  should not be a 1
+                    Integer.toString(mIPSelected));
+        } else {
+            //no records in table - add a record
+            ContentValues hostPrefValues = new ContentValues();
+            hostPrefValues.put(hosts.HostPrefData.HOST_NAME, "PIZW001");
+            hostPrefValues.put(hosts.HostPrefData.HOST_PREF, mIPSelected);
+            long newRow = db.insert(hosts.HostPrefData.TABLE_NAME, null, hostPrefValues);
+            Log.i("SSHDB", "addHosttoDB: " + newRow);
+        }
     }
 
     /**
@@ -662,8 +788,10 @@ public class MainActivity extends AppCompatActivity {
 
             TextView ipUsed = (TextView) findViewById(R.id.ip_used);
             if (updateHostInfo) {
-                String aIP = prefBundle.getString(hosts.HostData.HOST_IP);
-                ipUsed.setText( aIP );
+                String aStr = prefBundle.getString(hosts.HostData.HOST_USER_NAME) + "@" +
+                        prefBundle.getString(hosts.HostData.HOST_IP) + "\nPort " +
+                        prefBundle.getString(hosts.HostData.HOST_PORT);
+                ipUsed.setText( aStr );
                 updateHostInfo = false;
             }
 
