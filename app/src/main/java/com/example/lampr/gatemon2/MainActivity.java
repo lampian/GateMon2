@@ -37,26 +37,27 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.example.lampr.gatemon2.SSH2IntentService.ACTION_CHANGE_HOST;
 import static com.example.lampr.gatemon2.SSH2IntentService.ACTION_GET_INPUTS;
-import static com.example.lampr.gatemon2.SSH2IntentService.ACTION_SET_OUT1;
-import static com.example.lampr.gatemon2.SSH2IntentService.ACTION_SET_OUT2;
+import static com.example.lampr.gatemon2.SSH2IntentService.ACTION_SET_OUT;
+import static com.example.lampr.gatemon2.SSH2IntentService.ACTION_SHUTDOWN;
 import static com.example.lampr.gatemon2.SSH2IntentService.BUNDLE_SSH_I2C_ADC1_STR;
 import static com.example.lampr.gatemon2.SSH2IntentService.BUNDLE_SSH_I2C_ADC2_STR;
 import static com.example.lampr.gatemon2.SSH2IntentService.BUNDLE_SSH_I2C_ADC3_STR;
 import static com.example.lampr.gatemon2.SSH2IntentService.BUNDLE_SSH_STATUS_STR;
 import static com.example.lampr.gatemon2.SSH2IntentService.BUNDLE_SSH_STR;
+import static com.example.lampr.gatemon2.SSH2IntentService.OUTPUT_CMND;
 
 
 public class MainActivity extends AppCompatActivity {
 
     int mIPSelected = 1;
-    //int mIPSelectedNew = 1;
-    boolean updateHostInfo = true;
+    int mSSHStatus = 1;
+    private static String SSHCMND1 = "pigs r 12";
+    boolean updateHostGui = true;
     Bundle prefBundle;
     //private ComponentName mServiceComponent;
 
-
+//TODO dont do any ssh connections if dbase empty
 
     // Handler for incoming messages from the service.
     private IncomingMessageHandler mHandler;
@@ -108,7 +109,9 @@ public class MainActivity extends AppCompatActivity {
         super.onStart();
         // Start service and provide it a way to communicate with this class.
         //Messenger messengerIncoming = new Messenger(mHandler);
-        SSHIntentService.startActionMonitorIO( this, "", "" );
+        Log.i("SSH1", "onStart: before call to startActionMonitorIO");
+        //pigs r 12 can be replaced with any valid pigs command
+        SSHIntentService.startActionMonitorIO( this, prefBundle, SSHCMND1);
     }
 
 //================================================
@@ -121,11 +124,23 @@ public class MainActivity extends AppCompatActivity {
         //start handler as activity become visible
         h.postDelayed( runnable = new Runnable() {
             public void run() {
-                //do something
-                Log.i("SSH :", "Handler for post delay");
+                Log.i("SSH2 :", "Handler for post delay");
+
                 Messenger messengerIncoming = new Messenger(mHandler);
-                //mIntent.startActionSetOut1( this, messengerIncoming, "" );
-                SSH2IntentService.startSSH2Service(getApplicationContext(), ACTION_GET_INPUTS, messengerIncoming, "");
+                //schedule start of service to be based on timer as a minimum but use message from service as maximum
+                //if things go right the use delay
+                //if things go wrong with SSH (50 seconds delay) wait for message from ssh service before starting another service
+                //this stops the effect that multiple service are qued when IP incorrect.
+                //a wrong IP can cause a 50 seconds + delay on messages
+                if (mSSHStatus>0) {
+                    SSH2IntentService.startSSH2Service(getApplicationContext(), ACTION_GET_INPUTS, messengerIncoming, prefBundle );
+                    mSSHStatus = 0;
+                    Log.i("SSH2", " startSSH2Service " + prefBundle.getString(hosts.HostData.HOST_IP));
+                }
+                else {
+                    Log.i("SSH2", " startSSH2Service (wait) " + prefBundle.getString(hosts.HostData.HOST_IP));
+                    //TODO - what happens if another situation arises and the mSSHStatus is never set????
+                }
                 h.postDelayed(runnable, delay);
             }
         }, delay);
@@ -155,6 +170,7 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
+    //TODO add function to calibrate SSH connect timeout and receive data delay
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
@@ -168,6 +184,13 @@ public class MainActivity extends AppCompatActivity {
                 updateHostPrefInDB();
                 clearDB();
                 return true;
+            case R.id.stop_service:
+                SSHIntentService.interrupt();
+                return true;
+            case R.id.restart_service:
+                //scheduleJob();
+                SSHIntentService.startActionMonitorIO( this, prefBundle, SSHCMND1 );
+                return true;
         }
         return super.onOptionsItemSelected(item);
     }
@@ -179,18 +202,27 @@ public class MainActivity extends AppCompatActivity {
         //put data into Hostdata table
         ContentValues hostValues = new ContentValues();
         hostValues.put(hosts.HostData.HOST_IP, "192.168.1.125");
-        hostValues.put(hosts.HostData.HOST_NAME, "PI");
+        hostValues.put(hosts.HostData.HOST_NAME, "pizw002");
         hostValues.put(hosts.HostData.HOST_PORT, "22");
+        hostValues.put(hosts.HostData.HOST_USER_NAME, "PI");
+        hostValues.put(hosts.HostData.HOST_PW, "lampiespi");
+        rowID = db.insert(hosts.HostData.TABLE_NAME, null, hostValues);
+        hostValues.clear();
+        Log.i("SSHDB", "insertDummyData: " + rowID);
+        //put data into Hostdata table
+        hostValues.put(hosts.HostData.HOST_IP, "192.168.1.108");
+        hostValues.put(hosts.HostData.HOST_NAME, "pizw001");
+        hostValues.put(hosts.HostData.HOST_PORT, "22");
+        hostValues.put(hosts.HostData.HOST_USER_NAME, "PI");
+        hostValues.put(hosts.HostData.HOST_PW, "lampiespi");
         rowID = db.insert(hosts.HostData.TABLE_NAME, null, hostValues);
         Log.i("SSHDB", "insertDummyData: " + rowID);
-
         //put data into HostPrefData table
         ContentValues hostPrefValues = new ContentValues();
         hostPrefValues.put(hosts.HostPrefData.HOST_NAME, "PIZW001");
-        hostPrefValues.put(hosts.HostPrefData.HOST_PREF, 0);
+        hostPrefValues.put(hosts.HostPrefData.HOST_PREF, 1);
         rowID = db.insert(hosts.HostPrefData.TABLE_NAME, null, hostPrefValues);
         Log.i("SSHDB", "insertDummyPrefData: " + rowID);
-
     }
 
     private void    clearDB() {
@@ -215,12 +247,10 @@ public class MainActivity extends AppCompatActivity {
         } else {
             tbTxt = "0";
         }
-        SSH2IntentService.startSSH2Service(this, ACTION_SET_OUT1, messengerIncoming, tbTxt);
+        Bundle aB = new Bundle();
+        aB.putString(OUTPUT_CMND, "pigs w 16 " + tbTxt);
+        SSH2IntentService.startSSH2Service(this, ACTION_SET_OUT, messengerIncoming, aB);
         Log.i("SSH2 :", "ScheduleJob LED 16");
-
-        //continue with reads
-        //mIntent.startActionGetInputs( this, messengerIncoming, "" );
-        //SSH2IntentService.startSSH2Service(this, ACTION_GET_INPUTS, messengerIncoming, "");
     }
 
     public void setLed17(View view) {
@@ -239,15 +269,59 @@ public class MainActivity extends AppCompatActivity {
         } else {
             tbTxt = "0";
         }
-
-        SSH2IntentService.startSSH2Service(this, ACTION_SET_OUT2, messengerIncoming, tbTxt);
+        Bundle aB = new Bundle();
+        aB.putString(OUTPUT_CMND, "pigs w 17 " + tbTxt);
+        SSH2IntentService.startSSH2Service(this, ACTION_SET_OUT, messengerIncoming, aB);
         Log.i("SSH2 :", "ScheduleJob LED 17");
+    }
 
-        //continue with reads
-        //mIntent.startActionGetInputs( this, messengerIncoming, "" );
-        //SSH2IntentService.startSSH2Service(this, ACTION_GET_INPUTS, messengerIncoming, "");
+    public void setLed18(View view) {
+        String tbTxt;
+        Intent sIntent = new Intent();
+        //sIntent.setAction(SSHIntentService.StopReceiver.ACTION_STOP);
+        sendBroadcast(sIntent);
+
+        Messenger messengerIncoming = new Messenger(mHandler);
+        //mIntent.startActionSetOut2( this, messengerIncoming, "" );
+        ToggleButton tb = findViewById(R.id.led18);
+
+        if ( tb.isChecked() ) {
+            tbTxt = "1";
+        } else {
+            tbTxt = "0";
+        }
+        Bundle aB = new Bundle();
+        aB.putString(OUTPUT_CMND, "pigs w 18 " + tbTxt);
+        SSH2IntentService.startSSH2Service(this, ACTION_SET_OUT, messengerIncoming, aB);
+        Log.i("SSH2 :", "ScheduleJob LED 18");
 
     }
+
+    public void setLed19(View view) {
+        String tbTxt;
+        Intent sIntent = new Intent();
+        //sIntent.setAction(SSHIntentService.StopReceiver.ACTION_STOP);
+        sendBroadcast(sIntent);
+
+        Messenger messengerIncoming = new Messenger(mHandler);
+        //mIntent.startActionSetOut2( this, messengerIncoming, "" );
+        ToggleButton tb = findViewById(R.id.led19);
+
+        if ( tb.isChecked() ) {
+            tbTxt = "1";
+        } else {
+            tbTxt = "0";
+        }
+        Bundle aB = new Bundle();
+        aB.putString(OUTPUT_CMND, "pigs w 19 " + tbTxt);
+        SSH2IntentService.startSSH2Service(this, ACTION_SET_OUT, messengerIncoming, aB);
+        Log.i("SSH2 :", "ScheduleJob LED 19");
+    }
+
+    public void setLed20(View view) {
+        Log.i("SSH2 :", "NOT ScheduleJob LED 20");
+    }
+
 
     public void shutdownDevice(View view) {
         Intent sIntent = new Intent();
@@ -255,13 +329,8 @@ public class MainActivity extends AppCompatActivity {
         sendBroadcast(sIntent);
 
         Messenger messengerIncoming = new Messenger(mHandler);
-        //mIntent.startActionSetOut3( this, messengerIncoming, "" );
-        SSH2IntentService.startSSH2Service(this, ACTION_CHANGE_HOST, messengerIncoming, "");
+        SSH2IntentService.startSSH2Service(this, ACTION_SHUTDOWN, messengerIncoming, null);
         Log.i("SSH :", "ScheduleJob Shutdown");
-
-        //continue with reads
-        //mIntent.startActionGetInputs( this, messengerIncoming, "" );
-
     }
 
     // selectIp creates a AlertDialog that enables user to:
@@ -282,12 +351,13 @@ public class MainActivity extends AppCompatActivity {
         builder.setCancelable(false);
         builder.setView(dialogView);
 
-        //------------------list
+        //-Add a list of IP's as recorded in the pref dbase
         final ArrayAdapter aAA = getHostDataFromDB();
+        int indexInList = getIndexofID(aAA, mIPSelected );
         // Set a single choice items list for alert dialog
         builder.setSingleChoiceItems(
             aAA, // Items list
-            mIPSelected - 1, // Index of checked item (-1 = no selection)
+            indexInList, // Index of checked item (-1 = no selection)
             new DialogInterface.OnClickListener() // Item click listener
             {
                 @Override
@@ -307,7 +377,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         );
-        //------------------list
+        //list of IP's added, now add rest of buttons and edit fields
         Button btnPos = dialogView.findViewById(R.id.dialog_positive_btn);
         Button btnNeg = dialogView.findViewById(R.id.dialog_negative_btn);
         final Button btnAdd = dialogView.findViewById(R.id.dialog_neutral_btn);
@@ -346,21 +416,25 @@ public class MainActivity extends AppCompatActivity {
                 removeItemFromDB(mIPSelected);
             }
         });
+        //accept selected item in list
         btnPos.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 dialog.cancel();
                 updateHostPrefInDB();
                 prefBundle = getHostPrefFromDB();
-                updateHostInfo = true;
+                UpdateSSHIntentServiceHost();
+                updateHostGui = true;
             }
         });
+        //no selections accepted, keep current IP
         btnNeg.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 dialog.dismiss();
             }
         });
+        //add information in edit views to db
         btnAdd.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -380,12 +454,19 @@ public class MainActivity extends AppCompatActivity {
                 mIPSelected = addHosttoDB( hostValues);
                 updateHostPrefInDB();
                 prefBundle = getHostPrefFromDB();
-                updateHostInfo = true;
+                updateHostGui = true;
                 //updateHostPrefInDB();
-                dialog.cancel();
+                dialog.cancel();//TODO - issue with selection after record added, _ID with gaps maybe an issue?
             }
         });
         dialog.show();
+    }
+
+    private void UpdateSSHIntentServiceHost() {
+
+        SSHIntentService.interrupt();
+        SSHIntentService.startActionMonitorIO( this, prefBundle, SSHCMND1 );
+
     }
 
     private void removeItemFromDB(int aID) {
@@ -403,6 +484,7 @@ public class MainActivity extends AppCompatActivity {
         Log.i("SSHDB", "addHosttoDB: " + newRow);
         return ((int) newRow);
     }
+
     // get all host entries in db and pack into a arrayadapter
     private ArrayAdapter getHostDataFromDB() {
         int noRows;
@@ -437,6 +519,7 @@ public class MainActivity extends AppCompatActivity {
         noRows = cursor.getCount();
         Log.i("SSHDB", "getHostDataFromDB: nr rows =" + noRows);
         List items = new ArrayList<>();
+
         while (cursor.moveToNext()) {
             String aID = cursor.getString( cursor.getColumnIndexOrThrow(hosts.HostData._ID));
             String aIP = cursor.getString( cursor.getColumnIndexOrThrow(hosts.HostData.HOST_IP));
@@ -444,14 +527,31 @@ public class MainActivity extends AppCompatActivity {
             items.add(newStr);
         }
         cursor.close();
+
         // Initialize a new array adapter instance
         ArrayAdapter arrayAdapter = new ArrayAdapter<String>(
-                this, // Context
-                android.R.layout.simple_list_item_single_choice, // Layout
-                items // List
+            this, // Context
+            android.R.layout.simple_list_item_single_choice, // Layout
+            items // List
         );
 
         return arrayAdapter;
+    }
+
+    //get index of specified ID in arrayadapter
+    private int getIndexofID( ArrayAdapter aAA, int aID) {
+        int i;
+        int indexB;
+        int check;
+        for (i = 0; i < aAA.getCount(); i++){
+            String aStr = aAA.getItem(i).toString();
+            indexB = aStr.indexOf(":", 0);
+            aStr = aStr.substring(0, indexB);
+            check = Integer.parseInt(aStr);
+            if (check == aID)
+                break;
+        }
+        return i;
     }
 
     private Bundle getHostPrefFromDB() {
@@ -484,7 +584,7 @@ public class MainActivity extends AppCompatActivity {
             aB.putString(hosts.HostData.HOST_NAME, "no name");
             aB.putString(hosts.HostData.HOST_USER_NAME, "no user");
             aB.putString(hosts.HostData.HOST_IP, "no ip");
-            aB.putString(hosts.HostData.HOST_PORT, "no port");
+            aB.putString(hosts.HostData.HOST_PORT, "1");
             aB.putString(hosts.HostData.HOST_PW, "no pw");
             aB.putString(hosts.HostData.HOST_NAME, "no host name");
             return aB;
@@ -547,7 +647,7 @@ public class MainActivity extends AppCompatActivity {
             aB.putString(hosts.HostData.HOST_NAME, "no name");
             aB.putString(hosts.HostData.HOST_USER_NAME, "no user");
             aB.putString(hosts.HostData.HOST_IP, "no ip");
-            aB.putString(hosts.HostData.HOST_PORT, "no port");
+            aB.putString(hosts.HostData.HOST_PORT, "1");
             aB.putString(hosts.HostData.HOST_PW, "no pw");
             aB.putString(hosts.HostData.HOST_NAME, "no host name");
         }
@@ -593,6 +693,8 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+
+
     /**
      * A {@link Handler} allows you to send messages associated with a thread. A {@link Messenger}
      * uses this handler to communicate from {@link SSHIntentService}.
@@ -635,6 +737,9 @@ public class MainActivity extends AppCompatActivity {
                 Log.i("SSH3 :", "Status read string bad");
             }
             ssh_status = aStr;
+            //indicate that a message was received from the service - timer scheduler to
+            //use it to decide if the system is ready to start another service
+            mSSHStatus = 1;
 
             aCharSeq = aB.getCharSequence( BUNDLE_SSH_STR );
             assert aCharSeq != null;
@@ -787,12 +892,12 @@ public class MainActivity extends AppCompatActivity {
             tv5.setText( aSSHStatus );
 
             TextView ipUsed = (TextView) findViewById(R.id.ip_used);
-            if (updateHostInfo) {
+            if (updateHostGui) {
                 String aStr = prefBundle.getString(hosts.HostData.HOST_USER_NAME) + "@" +
                         prefBundle.getString(hosts.HostData.HOST_IP) + "\nPort " +
                         prefBundle.getString(hosts.HostData.HOST_PORT);
                 ipUsed.setText( aStr );
-                updateHostInfo = false;
+                updateHostGui = false;
             }
 
             //make toggle button red if the shown and actual state of the bit differs,
@@ -822,6 +927,35 @@ public class MainActivity extends AppCompatActivity {
             } else {
                 tb2.setBackgroundColor(Color.RED);
             }
+
+            //make toggle button red if the shown and actual state of the bit differs,
+            //make toglle button green of the shown and actual state are the same, ie Off and 0
+            ToggleButton tb3 = findViewById(R.id.led18);
+            if ((aLong & 0x40000) > 0)
+                tbXOR = true;
+            else
+                tbXOR = false;
+            tbXOR ^= tb3.isChecked();
+            if (!tbXOR) {
+                tb3.setBackgroundColor(Color.GREEN);
+            } else {
+                tb3.setBackgroundColor(Color.RED);
+            }
+
+            //make toggle button red if the shown and actual state of the bit differs,
+            //make toglle button green of the shown and actual state are the same, ie Off and 0
+            ToggleButton tb4 = findViewById(R.id.led19);
+            if ((aLong & 0x80000) > 0)
+                tbXOR = true;
+            else
+                tbXOR = false;
+            tbXOR ^= tb4.isChecked();
+            if (!tbXOR) {
+                tb4.setBackgroundColor(Color.GREEN);
+            } else {
+                tb4.setBackgroundColor(Color.RED);
+            }
+
 
         }
     }

@@ -2,12 +2,25 @@ package com.example.lampr.gatemon2;
 
 import android.annotation.SuppressLint;
 import android.app.IntentService;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.os.Bundle;
+import android.support.v4.app.NotificationCompat;
+import android.support.v4.app.NotificationManagerCompat;
+import android.util.Log;
+
+import com.example.lampr.gatemon2.data.hosts;
+
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 //import android.app.NotificationChannel;
 //import android.app.PendingIntent;
-import android.content.BroadcastReceiver;
-import android.content.Intent;
-import android.content.Context;
-import android.content.IntentFilter;
 //import android.os.Build;
 //import android.os.Bundle;
 //import android.os.Message;
@@ -15,16 +28,8 @@ import android.content.IntentFilter;
 //import android.os.Parcelable;
 //import android.os.RemoteException;
 //import android.support.annotation.RequiresApi;
-import android.support.v4.app.NotificationCompat;
-import android.support.v4.app.NotificationManagerCompat;
-import android.util.Log;
 //import android.app.Notification;
 //import android.app.NotificationManager;
-
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
 
 //import static java.lang.Thread.sleep;
 
@@ -51,9 +56,10 @@ public class SSHIntentService extends IntentService {
     private static final String EXTRA_PARAM2 = "com.example.android.picntlservice.extra.PARAM2";
 
     final static int RQS_STOP_SERVICE = 1;
+    private static final String SSH_SETUP_INFO = "com.example.android.picntlservice.extra.SSH_SETUP_INFO";
 
     //instantiate SSHObject for use by this service
-    private static SSHObject aSSH;
+    private static SSHObject aSSH = new SSHObject();
 
     NotifyServiceReceiver notifyServiceReceiver;
     private static final int MY_NOTIFICATION_ID=1;
@@ -63,13 +69,16 @@ public class SSHIntentService extends IntentService {
     private NotificationCompat.Builder mBuilder;
 
     //private final String myBlog = "http://android-er.blogspot.com/";
-    private boolean continueGet = true;
-    private String prevSW5Value = "";
+    private static AtomicBoolean running = new AtomicBoolean(false);
+    private String prevSWValue = "";
     protected ArrayList notificationList = new ArrayList();
 
     final static String ACTION = "NotifyServiceAction";
 
-
+    public static void interrupt() {
+        running.set(false);
+        //SSHIntentService.interrupt();
+    }
 
     public class NotifyServiceReceiver extends BroadcastReceiver{
 
@@ -101,7 +110,7 @@ public class SSHIntentService extends IntentService {
 
     @Override
     public void onDestroy() {
-        unregisterReceiver(notifyServiceReceiver);
+        //unregisterReceiver(notifyServiceReceiver);
         super.onDestroy();
     }
 
@@ -113,7 +122,7 @@ public class SSHIntentService extends IntentService {
         notifyServiceReceiver = new NotifyServiceReceiver();
         super.onCreate();
         SetupNotification();
-        aSSH = new SSHObject("lampiespi","pi", "192.168.1.125", 22);
+        //aSSH = new SSHObject("lampiespi","pi", "192.168.1.125", 22);
         Log.i("SSH1 :", "onCreate()");
     }
 
@@ -124,13 +133,13 @@ public class SSHIntentService extends IntentService {
      * @see IntentService
      */
     // Main thread helper method
-    public static void startActionMonitorIO(Context context, String param1, String param2) {
+    public static void startActionMonitorIO(Context context, Bundle param1, String param2) {
         Intent intent = new Intent(context, SSHIntentService.class);
         intent.setAction(ACTION_Monitor_IO);
-        intent.putExtra(EXTRA_PARAM1, param1);
+        intent.putExtra( EXTRA_PARAM1,param1);
         intent.putExtra(EXTRA_PARAM2, param2);
         context.startService(intent);
-        Log.i("SSH1 :", "startActionMonitorIO()");
+        Log.i("SSH1 :", "startActionMonitorIO()" + param1 + " " + param2);
     }
 
 
@@ -147,32 +156,44 @@ public class SSHIntentService extends IntentService {
         if (intent != null) {
             final String action = intent.getAction();
             if (ACTION_Monitor_IO.equals(action)) {
-                //final String param1 = intent.getStringExtra(EXTRA_PARAM1);
-                final String param1 = intent.getStringExtra(EXTRA_PARAM1);
+                Bundle aB = intent.getBundleExtra(EXTRA_PARAM1);
                 final String param2 = intent.getStringExtra(EXTRA_PARAM2);
-                handleActionMonitorIO(param2);
+                handleActionMonitorIO( aB, param2 );
+                Log.i("SSH1", "onHandleIntent: ACTION_MONITOR_IO exit");
             }
         }
     }
-
+//TODO handle portrait to landscape changes by stopping activity - job restarts the service
     /**
      * Handle action getinputs provided background thread with the provided
      * parameters. Keep thread running.
      * After the first loop executed, wait for xxx seconds before executing get inputs actions.
      *
      */
-    private void handleActionMonitorIO(String param2) {
+    private void handleActionMonitorIO(Bundle param1, String param2) {
 
-        String sw5Value;
-        String sw5Str;
+        String swValue;
+        String swStr;
         String ssh_status = "not set";
         boolean go = true;
         long tnow;
         long tElapsed;
         long tStart = System.currentTimeMillis();
         long twait = 0;
+        SSHObject aSSHInfo = new SSHObject();
+        String cmndStr;
 
-        while (true) {
+        //extract sh info from bundle
+        aSSHInfo.mUserName = param1.getString(hosts.HostData.HOST_USER_NAME);
+        aSSHInfo.mHost = param1.getString(hosts.HostData.HOST_IP);
+        aSSHInfo.mPort = Integer.parseInt( param1.getString(hosts.HostData.HOST_PORT));
+        aSSHInfo.mPassWord = param1.getString(hosts.HostData.HOST_PW);
+        cmndStr = param2;
+        Log.i("SSH1", "handleActionMonitorIO: " + aSSHInfo.mUserName + " " +
+                aSSHInfo.mHost + " " + aSSHInfo.mPort + " " + aSSHInfo.mPassWord);
+        running.set(true);
+
+        while (running.get()) {
 
             tnow = System.currentTimeMillis();
             if ( tnow >= tStart) {
@@ -183,25 +204,25 @@ public class SSHIntentService extends IntentService {
             }
             if ( tElapsed > twait ) {
                 tStart = System.currentTimeMillis();
-                Log.i("SSH1 :", "handleAction MonIO - tElapsed : " + tElapsed);
+                Log.i("SSH1", "handleAction MonIO - tElapsed : " + tElapsed);
                 try {
-                    sw5Str = aSSH.GetSSHStr("pigs r 14");
-                    if ( prevSW5Value.isEmpty() ) {
-                        prevSW5Value = sw5Str;
+                    swStr = aSSH.GetSSHStr(aSSHInfo,cmndStr);
+                    if ( prevSWValue.isEmpty() ) {
+                        prevSWValue = swStr;
                     }
                     else {
-                        if ( !prevSW5Value.equalsIgnoreCase(sw5Str)) {
-                            prevSW5Value = sw5Str;
-                            if (sw5Str.contains("\n") ) {
-                                sw5Value = sw5Str.substring( 0, 1);
-                                aSSH.GetSSHStr("pigs w 18 " + sw5Str);
+                        if ( !prevSWValue.equalsIgnoreCase(swStr)) {
+                            prevSWValue = swStr;
+                            if (swStr.contains("\n") ) {
+                                swValue = swStr.substring( 0, 1);
+                                aSSH.GetSSHStr(aSSHInfo,cmndStr + " " + swStr);
                             }
                             else {
-                                sw5Value = "Unknown";
+                                swValue = "Unknown";
                             }
 
-                            notifySW5Change(sw5Value);
-                            Log.i("SSH1 :", "handleAction MonIO - SW5 :" + sw5Value);
+                            notifySWChange(swValue);
+                            Log.i("SSH1", "handleAction MonIO - SW :" + swValue);
 
                         }
                     }
@@ -210,10 +231,10 @@ public class SSHIntentService extends IntentService {
                     //aStr = "00000000/n";
                     //ssh_status = "SSH not ok 1";
                     //notifySSHIssue( ssh_status );
-                    Log.i("SSH1 :", "handleAction MonIO - exception");
+                    Log.i("SSH1", "handleAction MonIO - exception");
                 }
                 // wait x sec from now on - it seems android measures in 1/10 of msec!
-                twait = 2500;
+                twait = 5000;
             }
 
             //go = continueGet;
@@ -235,8 +256,8 @@ public class SSHIntentService extends IntentService {
         notificationManager.notify(MY_NOTIFICATION_ID, mBuilder.build() );
     }
 
-    private void notifySW5Change(String valStr) {
-        manageNotificationList("SW 14 state changed to " + valStr );
+    private void notifySWChange(String valStr) {
+        manageNotificationList("SW state changed to " + valStr );
     }
 
 

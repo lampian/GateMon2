@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:background="#e9f1ba"
     android:padding="10dp"
-    android:textSize="10dp"
+    android:textSize="9dp"
     tools:context=".MainActivity">
 
     <TextView
@@ -49,42 +49,52 @@
         android:layout_height="wrap_content"
         android:layout_below="@id/et_user"
         android:hint="Add user password" />
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/et_pw"
+        android:orientation="horizontal">
 
+        <Button
+            android:id="@+id/dialog_positive_btn"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="match_parent"
+            android:layout_below="@id/et_pw"
+            android:layout_alignParentRight="true"
+            android:background="#dde5ad"
+            android:text="Accept" />
 
-    <Button
-        android:id="@+id/dialog_positive_btn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/et_pw"
-        android:layout_alignParentRight="true"
-        android:background="#dde5ad"
-        android:text="Accept" />
+        <Button
+            android:id="@+id/dialog_neutral_btn"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="match_parent"
+            android:layout_alignBaseline="@+id/dialog_positive_btn"
+            android:layout_marginRight="3dp"
+            android:layout_toLeftOf="@id/dialog_positive_btn"
+            android:background="#dde5ad"
+            android:text="Add item"/>
+        <Button
+            android:id="@+id/dialog_negative_btn"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="match_parent"
+            android:layout_alignBaseline="@id/dialog_neutral_btn"
+            android:layout_marginRight="3dp"
+            android:layout_toLeftOf="@id/dialog_neutral_btn"
+            android:background="#dde5ad"
+            android:text="No change" />
+        <Button
+            android:id="@+id/dialog_delete_btn"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="match_parent"
+            android:layout_alignBaseline="@+id/dialog_negative_btn"
+            android:layout_marginRight="3dp"
+            android:layout_toLeftOf="@id/dialog_negative_btn"
+            android:background="#dde5ad"
+            android:text="Delete item"/>
+    </LinearLayout>
 
-    <Button
-        android:id="@+id/dialog_neutral_btn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignBaseline="@+id/dialog_positive_btn"
-        android:layout_marginRight="3dp"
-        android:layout_toLeftOf="@id/dialog_positive_btn"
-        android:background="#dde5ad"
-        android:text="Add item"/>
-    <Button
-        android:id="@+id/dialog_negative_btn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignBaseline="@id/dialog_neutral_btn"
-        android:layout_marginRight="3dp"
-        android:layout_toLeftOf="@id/dialog_neutral_btn"
-        android:background="#dde5ad"
-        android:text="No change" />
-    <Button
-        android:id="@+id/dialog_delete_btn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignBaseline="@+id/dialog_negative_btn"
-        android:layout_marginRight="3dp"
-        android:layout_toLeftOf="@id/dialog_negative_btn"
-        android:background="#dde5ad"
-        android:text="Delete item"/>
 </RelativeLayout>

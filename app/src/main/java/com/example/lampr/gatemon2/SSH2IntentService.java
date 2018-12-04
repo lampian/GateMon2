@@ -2,14 +2,16 @@ package com.example.lampr.gatemon2;
 
 import android.app.IntentService;
 import android.content.BroadcastReceiver;
-import android.content.Intent;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.Message;
 import android.os.Messenger;
 import android.os.Parcelable;
 import android.os.RemoteException;
 import android.util.Log;
+
+import com.example.lampr.gatemon2.data.hosts;
 
 /**
  * An {@link IntentService} subclass for handling asynchronous task requests in
@@ -20,9 +22,7 @@ import android.util.Log;
 public class SSH2IntentService extends IntentService {
 
     public static final String ACTION_GET_INPUTS = "com.example.android.picntlservice.action.GET_INPUTS";
-    public static final String ACTION_SET_OUT1 = "com.example.android.picntlservice.action.SET_OUT1";
-    public static final String ACTION_SET_OUT2 = "com.example.android.picntlservice.action.SET_OUT2";
-    public static final String ACTION_SET_OUT3 = "com.example.android.picntlservice.action.SET_OUT3";
+    public static final String ACTION_SET_OUT = "com.example.android.picntlservice.action.SET_OUT";
     public static final String ACTION_CHANGE_HOST = "com.example.android.picntlservice.action.CHANGE_HOST";
     public static final String ACTION_SHUTDOWN = "com.example.android.picntlservice.action.SHUTDOWN";
 
@@ -34,9 +34,11 @@ public class SSH2IntentService extends IntentService {
     public static final String BUNDLE_SSH_I2C_ADC2_STR = "com.example.android.picntlservice.extra.BUNDLE_SSH_I2C_ADC2_STR";
     public static final String BUNDLE_SSH_I2C_ADC3_STR = "com.example.android.picntlservice.extra.BUNDLE_SSH_I2C_ADC3_STR";
     public static final String BUNDLE_SSH_STATUS_STR = "com.example.android.picntlservice.extra.BUNDLE_SSH_STATUS_STR";
+    public static final String OUTPUT_CMND = "com.example.android.picntlservice.extra.OUTPUT_CMND";
 
     //instantiate SSHObject for use by this service
-    private static SSHObject aSSH;
+    public static SSHObject aSSH = new SSHObject();
+
     //i2c default handle
     static String mAdc1Handle = "0";
     static String mAdc2Handle = "1";
@@ -86,7 +88,7 @@ public class SSH2IntentService extends IntentService {
     @Override
     public void onCreate(){
         super.onCreate();
-        aSSH = new SSHObject("lampiespi","pi", "192.168.1.125", 22);
+        //aSSH = new SSHObject("lampiespi","pi", "192.168.1.125", 22);
         Log.i("SSH2 :", "onCreate()");
 
     }
@@ -99,52 +101,48 @@ public class SSH2IntentService extends IntentService {
      * @see IntentService
      */
     // Main thread helper method
-    public static void startSSH2Service(Context context, String action, Parcelable param1, String param2) {
+    public static void startSSH2Service(Context context, String action, Parcelable param1, Bundle param2) {
         Log.i("SSH2 :", "startSSH2Service");
         Intent intent = new Intent(context, SSH2IntentService.class);
         intent.setAction(action);
         intent.putExtra(EXTRA_PARAM1, param1);
         intent.putExtra(EXTRA_PARAM2, param2);
         context.startService(intent);
+
     }
 
     @Override
     protected void onHandleIntent(Intent intent) {
         if (intent != null) {
+            Log.i("SSH2 :", "on HandleIntent : entry");
             final String action = intent.getAction();
-
+            mActivityMessenger = intent.getParcelableExtra(EXTRA_PARAM1);
+            Bundle aB = intent.getBundleExtra(EXTRA_PARAM2);
             if (ACTION_GET_INPUTS.equals(action)) {
-                mActivityMessenger = intent.getParcelableExtra(EXTRA_PARAM1);
-                final String param2 = intent.getStringExtra(EXTRA_PARAM2);
-                Log.i("SSH2 :", "on HandleIntent - GET INPUTs");
-                handleActionGetInputs(param2);
-            } else if (ACTION_SET_OUT1.equals(action)) {
-                final String param2 = intent.getStringExtra(EXTRA_PARAM2);
-                mActivityMessenger = intent.getParcelableExtra(EXTRA_PARAM1);
-                Log.i("SSH2 :", "on HandleIntent - SET OUT1");
-                handleActionSetOut1(param2);
-            } else if (ACTION_SET_OUT2.equals(action)) {
-                final String param2 = intent.getStringExtra(EXTRA_PARAM2);
-                mActivityMessenger = intent.getParcelableExtra(EXTRA_PARAM1);
-                Log.i("SSH2 :", "on HandleIntent - SET OUT2");
-                handleActionSetOut2(param2);
+                Log.i("SSH2 :", "on HandleIntent - Update host and GET INPUTs");
+                changeHost(aB);
+                handleActionGetInputs();
+            } else if (ACTION_SET_OUT.equals(action)) {
+                Log.i("SSH2 :", "on HandleIntent - SET OUT");
+                handleActionSetOut(aB);
             } else if (ACTION_SHUTDOWN.equals(action)) {
                 //final String param2 = intent.getStringExtra(EXTRA_PARAM2);
-                mActivityMessenger = intent.getParcelableExtra(EXTRA_PARAM1);
                 Log.i("SSH2 :", "on HandleIntent - SET OUT3");
-                handleActionSetOut3();
+                handleActionShutDown();
             } else if (ACTION_CHANGE_HOST.equals(action)) {
                 //string contains new host ip
-                final String param2 = intent.getStringExtra(EXTRA_PARAM2);
-                mActivityMessenger = intent.getParcelableExtra(EXTRA_PARAM1);
                 Log.i("SSH2 :", "on HandleIntent - Change host");
-                changeHost( param2 );
+                changeHost( aB );
             }
+            Log.i("SSH2", "onHandleIntent: exit");
             //unregisterReceiver(receiver);
+        }
+        else {
+            Log.i("SSH2", "onHandleIntent: exit");
         }
     }
 
-    private void handleActionGetInputs(String param2) {
+    private void handleActionGetInputs() {
 
         String aStr;
         String[] retStr = new String[4];
@@ -152,21 +150,14 @@ public class SSH2IntentService extends IntentService {
 
         Log.i("SSH2 :", "handleAction Get Inputs");
         try {
-            if (gpio19) {
-                aStr = aSSH.GetSSHStr("pigs w 19 1 br1 " +
-                        " i2crd " + mAdc1Handle + " 2" +
-                        " i2crd " + mAdc2Handle + " 2" +
-                        " i2crd " + mAdc3Handle + " 2");
-            } else {
-                aStr = aSSH.GetSSHStr("pigs w 19 0 br1 " +
-                        " i2crd " + mAdc1Handle + " 2" +
-                        " i2crd " + mAdc2Handle + " 2" +
-                        " i2crd " + mAdc3Handle + " 2");
-            }
-            gpio19 = !gpio19;
+            aStr = aSSH.GetSSHStr(aSSH,"pigs br1 " +
+                    " i2crd " + mAdc1Handle + " 2" +
+                    " i2crd " + mAdc2Handle + " 2" +
+                    " i2crd " + mAdc3Handle + " 2");
         } catch (Exception e) {
             aStr = "00000000/n";
             sshOK = false;
+            Log.i("SSH2 :", "handleAction Get Inputs - exception ssh not ok");
         }
         retStr = parceSSHStr(aStr);
         checkADCInit(retStr);
@@ -177,9 +168,11 @@ public class SSH2IntentService extends IntentService {
         aB.putString(BUNDLE_SSH_I2C_ADC3_STR, retStr[3]);
         if (sshOK) {
             aB.putString(BUNDLE_SSH_STATUS_STR, "SSH2 OK 1");
+            aB.putInt("SSH_STATUS", 1);
         }
         else {
-            aB.putString(BUNDLE_SSH_STATUS_STR, "SSH2 NOT OK 1");
+            aB.putString(BUNDLE_SSH_STATUS_STR, "SSH2 \n NOT OK 1");
+            aB.putInt("SSH_STATUS", 0);
         }
         Message aM = new Message();
         aM.setData(aB);
@@ -222,21 +215,21 @@ public class SSH2IntentService extends IntentService {
         try {
             if ( sshStr[1].contains("-") ) {
                 //TODO verify first init of i2c bus
-                i2cResp = aSSH.GetSSHStr( "pigs i2co 1 " + ADC1 + " 0");
+                i2cResp = aSSH.GetSSHStr(aSSH, "pigs i2co 1 " + ADC1 + " 0");
                 if (i2cResp.contains("\n")) {
                         mAdc1Handle = i2cResp.substring(0, 1);
                 }
             }
             if ( sshStr[2].contains("-") ) {
                 //TODO verify first init of i2c bus
-                i2cResp = aSSH.GetSSHStr( "pigs i2co 1 " + ADC2 + " 0");
+                i2cResp = aSSH.GetSSHStr(aSSH, "pigs i2co 1 " + ADC2 + " 0");
                 if (i2cResp.contains("\n")) {
                     mAdc2Handle = i2cResp.substring(0, 1);
                 }
             }
             if ( sshStr[3].contains("-") ) {
                 //TODO verify first init of i2c bus
-                i2cResp = aSSH.GetSSHStr( "pigs i2co 1 " + ADC3 + " 0");
+                i2cResp = aSSH.GetSSHStr(aSSH, "pigs i2co 1 " + ADC3 + " 0");
                 if (i2cResp.contains("\n")) {
                     mAdc3Handle = i2cResp.substring(0, 1);
                 }
@@ -253,13 +246,14 @@ public class SSH2IntentService extends IntentService {
      * Handle action in the provided background thread with the provided
      * parameters.
      */
-    private void handleActionSetOut1(String par2) {
+    private void handleActionSetOut(Bundle aB) {
         String aStr;
         boolean sshOK = true;
 
-        Log.i("SSH2 :", "handleAction Set Out1");
+        String par2 = aB.getString(OUTPUT_CMND);
+        Log.i("SSH2 :", "handleAction Set Out " + par2);
         try {
-            aStr = aSSH.GetSSHStr("pigs w 16 " + par2 );
+            aStr = aSSH.GetSSHStr(aSSH,par2 );
         } catch (Exception e) {
             aStr = "00000000/n";
             sshOK = false;
@@ -270,13 +264,13 @@ public class SSH2IntentService extends IntentService {
      * Handle action in the provided background thread with the provided
      * parameters.
      */
-    private void handleActionSetOut2(String par2) {
+    private void handleActionShutDown() {
         boolean sshOK = true;
         String aStr;
 
-        Log.i("SSH2 :", "handleAction Set Out2");
+        Log.i("SSH2 :", "handleAction Shutdown pi");
         try {
-            aStr = aSSH.GetSSHStr("pigs w 17 " + par2 );
+            aStr = aSSH.GetSSHStr(aSSH,"sudo shutdown -h now");
         } catch (Exception e) {
             aStr = "00000000/n";
             sshOK = false;
@@ -287,25 +281,16 @@ public class SSH2IntentService extends IntentService {
      * Handle action in the provided background thread with the provided
      * parameters.
      */
-    private void handleActionSetOut3() {
-        boolean sshOK = true;
-        String aStr;
+    private void changeHost( Bundle param1 ) {
 
-        Log.i("SSH2 :", "handleAction Set Out3");
-        try {
-            aStr = aSSH.GetSSHStr("sudo shutdown -h now");
-        } catch (Exception e) {
-            aStr = "00000000/n";
-            sshOK = false;
-        }
-    }
+        //extract ssh info from bundle
+        aSSH.mUserName = param1.getString(hosts.HostData.HOST_USER_NAME);
+        aSSH.mHost = param1.getString(hosts.HostData.HOST_IP);
+        aSSH.mPort = Integer.parseInt( param1.getString(hosts.HostData.HOST_PORT));
+        aSSH.mPassWord = param1.getString(hosts.HostData.HOST_PW);
+        Log.i("SSH2", "ChangeHost: " + aSSH.mUserName + " " +
+                aSSH.mHost + " " + aSSH.mPort + " " + aSSH.mPassWord);
 
-    /**
-     * Handle action in the provided background thread with the provided
-     * parameters.
-     */
-    private void changeHost( String newHostIP ) {
-        aSSH.SetHost(newHostIP);
     }
 
     private void notifySSHIssue( String ssh_status) {
